@@ -45,13 +45,20 @@ using (UnitySqlCommand cmd = new UnitySqlCommand("<Your sql statement WHERE Id =
 }
 ```
 
-## Other return types for StoredProcedure and UnitySqlCommand:
+## Other return types and execution methods for StoredProcedure and UnitySqlCommand:
 ```c#
 void Execute();
 DataSet OpenDataSet([name = null]);
 IEnumerable<DataRow> GetRows();
 IEnumerable<IEnumerable<DataRow>> GetRowSets();
-T ExecuteScalar([defaultValue]);
+object ExecuteScalar();
+bool ExecuteScalar(bool defaultValue = false);
+byte[] ExecuteScalar(byte[] defaultValue = null);
+DateTime? ExecuteScalar(DateTime? defaultValue = null);
+long ExecuteScalar(long defaultValue = null);
+int ExecuteScalar(int defaultValue = null);
+string ExecuteScalar(string defaultValue = null);
+SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default)
 ```
 
 ## Executing within a transaction
