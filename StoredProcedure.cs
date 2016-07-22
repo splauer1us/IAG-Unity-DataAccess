@@ -1,0 +1,531 @@
+﻿using Iag.Unity.DataAccess.Exceptions;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Text;
+
+namespace Iag.Unity.DataAccess
+{
+    public class StoredProcedure : IDisposable
+    {
+        private static string GetProcedureTextSql = "SELECT OBJECT_DEFINITION(OBJECT_ID(N'{0}', 'P')) AS objectText";
+        private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.CurrentCultureIgnoreCase);
+        private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.CurrentCultureIgnoreCase);
+
+        private int timeout = 300;
+        private bool isPrepared;
+        private bool isDisposed;
+        private string procedureName;
+        private int? returnValue;
+        private bool externalConnection = false;
+
+        public TimeSpan ExecuteTime { get; set; }
+        public TimeSpan PrepareTime { get; set; }
+
+        private SqlConnection sqlConnection;
+        private SqlCommand sqlCommand;
+
+        private List<SqlParameter> derivedParameters = new List<SqlParameter>();
+
+        public List<SqlParameter> DerivedParameters
+        {
+            get { return derivedParameters; }
+        }
+
+        public Dictionary<string, object> Parameters
+        {
+            get { return parameters; }
+        }
+
+        public int? ReturnValue
+        {
+            get { return returnValue; }
+        }
+        public SqlConnection Connection
+        {
+            get { return sqlConnection; }
+            set
+            {
+                if (this.sqlConnection != null)
+                    CloseConnection();
+                isPrepared = false;
+                this.sqlConnection = value;
+            }
+        }
+
+        public string CommandText
+        {
+            get { return (sqlCommand == null ? String.Empty : sqlCommand.CommandText); }
+            set
+            {
+                if (!IsPrepared)
+                    Prepare();
+                if (sqlCommand == null)
+                    throw new InvalidOperationException("The sql command has not been initialized.  Prepare() before setting the command text.");
+                sqlCommand.CommandText = value;
+            }
+        }
+
+        public SqlCommand Command
+        {
+            get { return sqlCommand; }
+        }
+
+        public bool IsPrepared
+        {
+            get { return isPrepared; }
+            set { isPrepared = value; }
+        }
+
+        public int Timeout
+        {
+            get { return timeout; }
+            set
+            {
+                if (timeout != value)
+                    isPrepared = false;
+                timeout = value;
+            }
+        }
+
+        public StoredProcedure() : this(null, String.Empty) { }
+
+        public StoredProcedure(string procedureName)
+            : this(null, procedureName) { }
+
+        public StoredProcedure(SqlConnection connection, string procedureName)
+        {
+            this.procedureName = procedureName;
+            if (connection == null)
+            {
+
+                connection = DataLibrary.GetConnection();
+
+            }
+            else
+                externalConnection = true;
+            this.sqlConnection = connection;
+        }
+
+        public void Prepare()
+        {
+            Prepare(null);
+        }
+
+        public void Prepare(SqlTransaction trans)
+        {
+            DateTime start = DateTime.Now;
+            if (sqlConnection == null)
+                throw new InvalidOperationException("The sql connection is null.");
+            if (this.sqlCommand == null || (this.sqlCommand.Transaction == null && trans != null) || (this.sqlCommand.Transaction != null && trans == null))
+                this.sqlCommand = GetCommand(procedureName, this.sqlConnection, trans);
+
+            isPrepared = true;
+            PrepareTime = DateTime.Now.Subtract(start);
+        }
+
+        private SqlCommand GetCommand(string procedureName, SqlConnection sqlConnection, SqlTransaction transaction)
+        {
+            SqlCommand cmd = new SqlCommand(procedureName, sqlConnection, transaction);
+            cmd.CommandType = (this is UnitySqlCommand ? CommandType.Text : CommandType.StoredProcedure);
+            cmd.CommandTimeout = timeout;
+            cmd.Parameters.Clear();
+
+            if (!(this is UnitySqlCommand))
+                FillParameters(cmd);
+
+
+            return cmd;
+        }
+
+        private void FillParameters(SqlCommand command)
+        {
+            OpenConnection();
+            SqlCommandBuilder.DeriveParameters(command);
+
+            this.parameters = new Dictionary<string, object>(StringComparer.CurrentCultureIgnoreCase);
+            foreach (SqlParameter parm in command.Parameters)
+            {
+                this.derivedParameters.Add(parm);
+            }
+        }
+
+        public void Execute()
+        {
+            try
+            {
+                DateTime start = DateTime.Now;
+                if (!isPrepared)
+                    Prepare();
+
+                OpenConnection();
+                TransferParameters();
+
+                this.sqlCommand.ExecuteNonQuery();
+                TransferParametersPost();
+                ExecuteTime = DateTime.Now.Subtract(start);
+            }
+            catch (SqlException ex)
+            {
+                throw BuildContextException(ex);
+            }
+        }
+
+        private ContextualSqlException BuildContextException(SqlException ex)
+        {
+            string context;
+
+            try
+            {
+                StringBuilder builder = new StringBuilder();
+
+                builder.AppendLine("Query:");
+                builder.AppendLine(this.sqlCommand.CommandText);
+                builder.AppendLine();
+
+                builder.AppendLine("Parameters:");
+
+                Func<object, string> isNull = (value) => (value == null || value == DBNull.Value ? "(null)" : Convert.ToString(value));
+
+                this.sqlCommand.Parameters.Cast<SqlParameter>().ToList().ForEach(parameter =>
+                {
+                    builder.Append(parameter.ParameterName).Append(" = ").Append(isNull(parameter.Value)).AppendLine();
+                });
+
+                context = builder.ToString();
+            }
+            catch (Exception ex2)
+            {
+                DataLibrary.LoggingCallback(ex2);
+                context = ("Exception building context:" + Environment.NewLine + DataLibrary.BuildExceptionMessage(ex2));
+            }
+
+            return new ContextualSqlException(ex.Message, ex, context);
+        }
+
+        private void TransferParameters()
+        {
+            this.sqlCommand.Parameters.Clear();
+            if (!(this is UnitySqlCommand))
+            {
+                foreach (SqlParameter dparm in derivedParameters)
+                {
+                    this.sqlCommand.Parameters.Add(dparm);
+                    if (parameters.ContainsKey(dparm.ParameterName))
+                        dparm.Value = parameters[dparm.ParameterName];
+
+                }
+            }
+            else
+            {
+                foreach (KeyValuePair<string, object> kvp in this.Parameters)
+                {
+                    this.sqlCommand.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                }
+            }
+
+            foreach (var kvp in this.explicitParameterTypes)
+            {
+                if (this.sqlCommand.Parameters.Contains(kvp.Key))
+                    this.sqlCommand.Parameters[kvp.Key].SqlDbType = kvp.Value;
+            }
+        }
+
+        public SqlTransaction BeginTransaction()
+        {
+            OpenConnection();
+            Prepare(sqlConnection.BeginTransaction(IsolationLevel.Serializable));
+            return sqlCommand.Transaction;
+        }
+
+        public void Commit()
+        {
+            if (sqlCommand.Transaction != null)
+                sqlCommand.Transaction.Commit();
+        }
+
+        public void Rollback()
+        {
+            if (sqlCommand.Transaction != null)
+                sqlCommand.Transaction.Rollback();
+        }
+
+        private void CloseConnection()
+        {
+            if (sqlConnection == null)
+                throw new InvalidOperationException("The sql connection is null.");
+            if (externalConnection || sqlCommand.Transaction != null) return;
+            if (sqlConnection.State != System.Data.ConnectionState.Closed)
+                sqlConnection.Close();
+        }
+
+        private void OpenConnection()
+        {
+            if (sqlConnection == null)
+                throw new InvalidOperationException("The sql connection is null.");
+
+            if (sqlConnection.State != System.Data.ConnectionState.Open)
+                sqlConnection.Open();
+        }
+
+        public DataSet OpenDataSet(string name = null)
+        {
+            try
+            {
+                if (!isPrepared)
+                    Prepare();
+
+                DateTime start = DateTime.Now;
+                TransferParameters();
+
+                OpenConnection();
+                SqlDataAdapter da = new SqlDataAdapter(this.sqlCommand);
+                DataSet ds = String.IsNullOrWhiteSpace(name) ? new DataSet() : new DataSet(name);
+                da.Fill(ds);
+                TransferParametersPost();
+                ExecuteTime = DateTime.Now.Subtract(start);
+
+                return ds;
+            }
+            catch (SqlException ex)
+            {
+                throw BuildContextException(ex);
+            }
+        }
+
+        private void TransferParametersPost()
+        {
+            foreach (SqlParameter param in this.sqlCommand.Parameters)
+            {
+                if (param.Direction == ParameterDirection.Input) continue;
+                if (param.Direction == ParameterDirection.ReturnValue)
+                {
+                    if (param.Value is Int32)
+                        this.returnValue = (int)param.Value;
+                    else
+                        this.returnValue = null;
+                    continue;
+                }
+                if (this.parameters.ContainsKey(param.ParameterName))
+                    this.parameters[param.ParameterName] = param.Value;
+                else
+                    this.parameters.Add(param.ParameterName, param.Value);
+            }
+        }
+
+        public DataTable OpenTable(string name = null)
+        {
+            DataSet ds = OpenDataSet();
+            if (ds.Tables.Count > 0)
+            {
+                if (!String.IsNullOrWhiteSpace(name))
+                    ds.Tables[0].TableName = name;
+                DataTable tble = ds.Tables[0];
+                ds.Tables.Remove(tble);
+                return tble;
+            }
+            else
+                return new DataTable();
+        }
+
+        public SqlDataReader GetDataReader()
+        {
+            try
+            {
+                if (!isPrepared)
+                    Prepare();
+                TransferParameters();
+
+                OpenConnection();
+                return this.sqlCommand.ExecuteReader(CommandBehavior.CloseConnection);
+            }
+            catch (SqlException ex)
+            {
+                throw BuildContextException(ex);
+            }
+        }
+
+        public object ExecuteScalar()
+        {
+            try
+            {
+                if (!isPrepared)
+                    Prepare();
+                TransferParameters();
+
+                OpenConnection();
+
+                DateTime start = DateTime.Now;
+                object ret = this.sqlCommand.ExecuteScalar();
+                TransferParametersPost();
+                ExecuteTime = DateTime.Now.Subtract(start);
+
+                return ret;
+            }
+            catch (SqlException ex)
+            {
+                throw BuildContextException(ex);
+            }
+        }
+
+        public int ExecuteScalar(int defaultValue = 0)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            int output;
+            if (Int32.TryParse(Convert.ToString(val), out output))
+                return output;
+            else
+                return defaultValue;
+        }
+
+
+        public byte[] ExecuteScalar(byte[] defaultValue)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            if (val is byte[])
+                return (byte[])val;
+            else
+                return defaultValue;
+        }
+
+
+        public string ExecuteScalar(string defaultValue = null)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            if (val != DBNull.Value)
+                return Convert.ToString(val);
+            else
+                return defaultValue;
+        }
+
+        public bool ExecuteScalar(bool defaultValue = false)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            if (val is bool)
+                return Convert.ToBoolean(val);
+            else
+                return defaultValue;
+        }
+        public DateTime? ExecuteScalar(DateTime? defaultValue = null)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            if (val is DateTime)
+                return Convert.ToDateTime(val);
+            else
+                return defaultValue;
+        }
+        public long ExecuteScalar(long defaultValue = 0)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            long output;
+
+            if (Int64.TryParse(Convert.ToString(val), out output))
+                return output;
+            else
+                return defaultValue;
+        }
+
+        public SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default)
+        {
+            try
+            {
+                if (!isPrepared)
+                    Prepare();
+                TransferParameters();
+
+                OpenConnection();
+                return this.sqlCommand.ExecuteReader(commandBehavior);
+            }
+            catch (SqlException ex)
+            {
+                throw BuildContextException(ex);
+            }
+        }
+
+        public void SetParameterType(string parameterName, SqlDbType parameterType)
+        {
+            explicitParameterTypes[parameterName] = parameterType;
+        }
+
+        public static string GetProcedureText(string procedureName, SqlConnection conn = null)
+        {
+            bool externalConnection = conn != null;
+            try
+            {
+                if (conn == null)
+                    conn = DataLibrary.GetConnection();
+                using (UnitySqlCommand cmd = new UnitySqlCommand(conn, GetProcedureTextSql, procedureName))
+                {
+                    return cmd.ExecuteScalar(String.Empty);
+                }
+            }
+            finally
+            {
+                if (externalConnection && conn != null)
+                    conn.Dispose();
+            }
+        }
+
+        #region IDisposable Members
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (!this.isDisposed)
+            {
+                if (disposing)
+                {
+                    DisposeObjects();
+                }
+            }
+            this.isDisposed = true;
+        }
+
+        private void DisposeObjects()
+        {
+
+            if (this.sqlCommand != null)
+                this.sqlCommand.Dispose();
+
+            //only dispose of connection if we created it
+            if (this.sqlConnection != null && !externalConnection)
+            {
+                this.sqlConnection.Dispose();
+            }
+        }
+
+        #endregion
+        /// <summary>
+        /// Finalizer for this class
+        /// </summary>
+        ~StoredProcedure()
+        {
+            Dispose(false);
+        }
+    }
+}
