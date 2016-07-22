@@ -1,4 +1,7 @@
 # IAG-Unity-DataAccess
+## NuGet Package Page
+https://www.nuget.org/packages/Iag.Unity.DataAccess.dll/
+
 ## First things first.  Initialize your data library:
 ```c#
 DataLibrary.Initialize("<Your connection string here>");
