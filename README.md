@@ -6,7 +6,17 @@ https://www.nuget.org/packages/Iag.Unity.DataAccess.dll/
 ```c#
 DataLibrary.Initialize("<Your connection string here>");
 ```
-Initializing the DataLibrary will let you avoid having to specify a connection string or SqlConnection on each StoredProcedure or UnitySqlCommand object. 
+Initializing the DataLibrary will let you avoid having to specify a connection string or SqlConnection on each StoredProcedure or UnitySqlCommand object. If you elect to not generally initialize the connection (possibly because you are managing multiple connections) the constructors for StoredProcedure and UnitySqlCommand take a SqlConnection as the first parameter:
+```c#
+using (SqlConnection conn1 = new SqlConnection("<Your connection string here>"))
+using (SqlConnection conn2 = new SqlConnection("<Your connection string here>"))
+using (StoredProcedure sp = new StoredProcedure(conn1, "<Your procedure name>")) 
+using (UnitySqlCommand cmd = new UnitySqlCommand(conn2 "<Your procedure name>"))
+{
+     // The data access library takes care of opening the SqlConnection object if it isn't already open.
+     ...
+}
+```
 
 ## Executing a stored procedure without parameters (returning a single table):
 ```c#
