@@ -315,6 +315,16 @@ namespace Iag.Unity.DataAccess
             }
         }
 
+        public IEnumerable<DataRow> GetRows()
+        {
+            return OpenTable().Rows.Cast<DataRow>();
+        }
+
+        public IEnumerable<IEnumerable<DataRow>> GetRowSets()
+        {
+            return OpenDataSet().Tables.Cast<DataTable>().Select(table => table.Rows.Cast<DataRow>());
+        }
+
         public DataTable OpenTable(string name = null)
         {
             DataSet ds = OpenDataSet();
