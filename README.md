@@ -61,7 +61,7 @@ void Execute();
 DataSet OpenDataSet([name = null]);
 IEnumerable<DataRow> GetRows();
 IEnumerable<IEnumerable<DataRow>> GetRowSets();
-IEnumberable GetObjects<T>();
+IEnumberable<T> GetObjects<T>();
 object ExecuteScalar();
 T ExecuteScalar<T>(T defaultValue);
 SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default);
