@@ -67,7 +67,7 @@ T ExecuteScalar<T>(T defaultValue);
 SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default);
 ```
 
-The following calls have been marked [Obsolete].  Use ExecuteScalar<T>() instead.
+The following calls have been marked [Obsolete].  Use ```ExecuteScalar<T>()``` instead.
 ```c#
 bool ExecuteScalar(bool defaultValue = false);
 byte[] ExecuteScalar(byte[] defaultValue = null);
