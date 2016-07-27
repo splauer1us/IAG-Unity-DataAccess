@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace Iag.Unity.DataAccess
@@ -380,6 +381,16 @@ namespace Iag.Unity.DataAccess
             }
         }
 
+        public T ExecuteScalar<T>(T defaultValue)
+        {
+            DateTime start = DateTime.Now;
+            object val = ExecuteScalar();
+            ExecuteTime = DateTime.Now.Subtract(start);
+
+            return (T)Convert.ChangeType(val, typeof(T));
+        }
+
+        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
         public int ExecuteScalar(int defaultValue = 0)
         {
             DateTime start = DateTime.Now;
@@ -394,6 +405,7 @@ namespace Iag.Unity.DataAccess
         }
 
 
+        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
         public byte[] ExecuteScalar(byte[] defaultValue)
         {
             DateTime start = DateTime.Now;
@@ -407,6 +419,7 @@ namespace Iag.Unity.DataAccess
         }
 
 
+        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
         public string ExecuteScalar(string defaultValue = null)
         {
             DateTime start = DateTime.Now;
@@ -419,6 +432,7 @@ namespace Iag.Unity.DataAccess
                 return defaultValue;
         }
 
+        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
         public bool ExecuteScalar(bool defaultValue = false)
         {
             DateTime start = DateTime.Now;
@@ -430,6 +444,8 @@ namespace Iag.Unity.DataAccess
             else
                 return defaultValue;
         }
+
+        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
         public DateTime? ExecuteScalar(DateTime? defaultValue = null)
         {
             DateTime start = DateTime.Now;
@@ -441,6 +457,8 @@ namespace Iag.Unity.DataAccess
             else
                 return defaultValue;
         }
+
+        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
         public long ExecuteScalar(long defaultValue = 0)
         {
             DateTime start = DateTime.Now;
@@ -486,7 +504,7 @@ namespace Iag.Unity.DataAccess
                     conn = DataLibrary.GetConnection();
                 using (UnitySqlCommand cmd = new UnitySqlCommand(conn, GetProcedureTextSql, procedureName))
                 {
-                    return cmd.ExecuteScalar(String.Empty);
+                    return cmd.ExecuteScalar<string>(String.Empty);
                 }
             }
             finally
@@ -495,6 +513,51 @@ namespace Iag.Unity.DataAccess
                     conn.Dispose();
             }
         }
+
+        public IEnumerable<T> GetObjects<T>(bool strict = false) where T : class, new()
+        {
+            return GetRows().ToList().Select(row =>
+            {
+                T obj = Activator.CreateInstance<T>();
+                Fill<T>(obj, row, strict);
+                return obj;
+            });
+        }
+
+
+        // http://stackoverflow.com/questions/374651/how-to-check-if-an-object-is-nullable
+        private bool IsNullable(Type type)
+        {
+            return (!type.IsValueType || Nullable.GetUnderlyingType(type) != null);
+        }
+
+        private void Fill<T>(T obj, DataRow row, bool strict) where T : class
+        {
+            Type type = obj.GetType();
+
+            var sc = strict ? StringComparer.CurrentCulture : StringComparer.CurrentCultureIgnoreCase;
+
+            type.GetProperties()
+                .Where(prop => row.Table.Columns.Cast<DataColumn>().Any(col => sc.Equals(col.ColumnName, prop.Name))) // Only props that match
+                .ToList()
+                .ForEach(prop =>
+                {
+                    object value = row[prop.Name];
+                    if (value == DBNull.Value)
+                        value = null;
+
+                    object newValue = null;
+
+                    if (IsNullable(prop.PropertyType))
+                        newValue = (Nullable.GetUnderlyingType(prop.PropertyType) != null ? Convert.ChangeType(value, Nullable.GetUnderlyingType(prop.PropertyType)) : value);
+                    else
+                        newValue = Convert.ChangeType(value, prop.PropertyType);
+
+                    // This is what sets the class properties of the class
+                    prop.SetValue(obj, newValue, null);
+                });
+        }
+
 
         #region IDisposable Members
 
