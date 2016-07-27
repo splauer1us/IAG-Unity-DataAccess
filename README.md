@@ -61,14 +61,21 @@ void Execute();
 DataSet OpenDataSet([name = null]);
 IEnumerable<DataRow> GetRows();
 IEnumerable<IEnumerable<DataRow>> GetRowSets();
+IEnumberable GetObjects<T>();
 object ExecuteScalar();
+T ExecuteScalar<T>(T defaultValue);
+SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default);
+```
+
+The following calls have been marked [Obsolete].  Use ExecuteScalar<T>() instead.
+```c#
 bool ExecuteScalar(bool defaultValue = false);
 byte[] ExecuteScalar(byte[] defaultValue = null);
 DateTime? ExecuteScalar(DateTime? defaultValue = null);
 long ExecuteScalar(long defaultValue = null);
 int ExecuteScalar(int defaultValue = null);
 string ExecuteScalar(string defaultValue = null);
-SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default)
+
 ```
 
 ## Executing within a transaction
