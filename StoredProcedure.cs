@@ -11,7 +11,7 @@ namespace Iag.Unity.DataAccess
 {
     public class StoredProcedure : IDisposable
     {
-        private static string GetProcedureTextSql = "SELECT OBJECT_DEFINITION(OBJECT_ID(N'{0}', 'P')) AS objectText";
+        private static string GetProcedureTextSql = "SELECT OBJECT_DEFINITION(OBJECT_ID(@ProcName, 'P')) AS objectText";
         private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.CurrentCultureIgnoreCase);
         private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.CurrentCultureIgnoreCase);
 
@@ -502,8 +502,10 @@ namespace Iag.Unity.DataAccess
             {
                 if (conn == null)
                     conn = DataLibrary.GetConnection();
-                using (UnitySqlCommand cmd = new UnitySqlCommand(conn, GetProcedureTextSql, procedureName))
+                using (UnitySqlCommand cmd = new UnitySqlCommand(conn, GetProcedureTextSql))
                 {
+                    cmd.Prepare();
+                    cmd.Parameters["@ProcName"] = procedureName;
                     return cmd.ExecuteScalar<string>(String.Empty);
                 }
             }
