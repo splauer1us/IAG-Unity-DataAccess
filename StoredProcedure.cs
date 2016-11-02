@@ -387,7 +387,10 @@ namespace Iag.Unity.DataAccess
             object val = ExecuteScalar();
             ExecuteTime = DateTime.Now.Subtract(start);
 
-            return (T)Convert.ChangeType(val, typeof(T));
+            if ( val == null || val == DBNull.Value )
+                return defaultValue;
+            else
+                return (T)Convert.ChangeType(val, typeof(T));
         }
 
         [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
