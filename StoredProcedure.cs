@@ -387,7 +387,7 @@ namespace Iag.Unity.DataAccess
             object val = ExecuteScalar();
             ExecuteTime = DateTime.Now.Subtract(start);
 
-            if ( val == null )
+            if ( val == null || val == DBNull.Value )
                 return defaultValue;
             else
                 return (T)Convert.ChangeType(val, typeof(T));
