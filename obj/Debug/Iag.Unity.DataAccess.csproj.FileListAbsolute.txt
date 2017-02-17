@@ -1,5 +1,0 @@
-C:\Development\Git\IAG-Unity-DataAccess\bin\Debug\Iag.Unity.DataAccess.dll
-C:\Development\Git\IAG-Unity-DataAccess\bin\Debug\Iag.Unity.DataAccess.pdb
-C:\Development\Git\IAG-Unity-DataAccess\obj\Debug\Iag.Unity.DataAccess.dll
-C:\Development\Git\IAG-Unity-DataAccess\obj\Debug\Iag.Unity.DataAccess.pdb
-C:\Development\Git\IAG-Unity-DataAccess\obj\Debug\Iag.Unity.DataAccess.csprojResolveAssemblyReference.cache
