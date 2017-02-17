@@ -55,13 +55,71 @@ using (UnitySqlCommand cmd = new UnitySqlCommand("<Your sql statement WHERE Id =
 }
 ```
 
+## Utilizing GetObject<T>()
+The GetObject<T>() function allows you to take a single table and convert them into a list of objects.  This is a simple implementation that currently does not support collection properties automatically filled with a child data.  There are ways the GetObject<T>() method can be used:
+### Simply mapping field name in the data table to property name
+This example assumes that the object to be loaded with data has exact matching of the field name to the property.  The method can be invoked using an optional parameter indicating whether to evaluate property and field names in a case-insensitive or case-sensitive manner.
+```c#
+using (UnitySqlCommand sp = new UnitySqlCommand("SELECT CAST('2015-12-12 12:12:12 -08:00' as datetimeoffset) as 'DateTimeOffsetValue', 'string' as StringValue, 123 as IntValue, 12.34 as DoubleValue, '2015-10-12 12:12:44' as DateTimeValue, 1 as BoolValue"))
+{
+	/// This implementation will evaluate field->property mapping in a case-insensitive manner.
+	List<TestLoadClass> tlc1 = sp.GetObjects<TestLoadClass>().ToList();
+	
+	/// This implementation will evaluate field->property mapping in a case-sensitive manner.
+	List<TestLoadClass> tlc2 = sp.GetObjects<TestLoadClass>(true).ToList();
+}
+```
+
+### Utilizing the ```c#FieldToProperty``` attribute
+In this case, the target object class definition has properties decorated with ```c#[FieldToProperty('<fieldName>')```].
+```c#
+public class TestLoadClassMapped
+{
+	[FieldToProperty("STR")]
+	public string StringValue { get; set; }
+	[FieldToProperty("INT")]
+	public int? IntValue { get; set; }
+	[FieldToProperty("DBL")]
+	public double? DoubleValue { get; set; }
+	[FieldToProperty("DT")]
+	public DateTime? DateTimeValue { get; set; }
+	[FieldToProperty("DTO")]
+	public DateTimeOffset? DateTimeOffsetValue { get; set; }
+	[FieldToProperty("B")]
+	public bool? BoolValue { get; set; }
+}
+
+using (UnitySqlCommand sp = new UnitySqlCommand("SELECT 'string' as STR, 123 as INT, 12.34 as DBL, CAST('2015-10-12 12:12:44' as DateTime) as DT, CAST('2015-12-12 12:12:12 -08:00' as DateTimeOffset) as DTO, 0 as B"))
+{
+	List<TestLoadClassMapped> tlc = sp.GetObjects<TestLoadClassMapped>().ToList();
+}
+
+
+```
+
+### Utilizing a custom mapping function
+Create a function that receives a string parameter that indicates the table's field name to be mapped.  The result of the function is to return the property name to be populated.
+```c#            
+using (UnitySqlCommand sp = new UnitySqlCommand("SELECT 'string' as STR, 123 as INT, 12.34 as DBL, CAST('2015-10-12 12:12:44' as DateTime) as DT, CAST('2015-12-12 12:12:12 -08:00' as DateTimeOffset) as DTO, 0 as B"))
+{
+
+	Func<string, string> func = (x) =>
+	{
+		if (x == "STR") return "StringValue";
+		else if (x == "INT") return "IntValue";
+		return null;
+	};
+
+	List<TestLoadClassNullable> tlc = sp.GetObjects<TestLoadClassNullable>(func).ToList();
+}
+```
+
 ## Other return types and execution methods for StoredProcedure and UnitySqlCommand:
 ```c#
 void Execute();
 DataSet OpenDataSet([name = null]);
 IEnumerable<DataRow> GetRows();
 IEnumerable<IEnumerable<DataRow>> GetRowSets();
-IEnumberable<T> GetObjects<T>();
 object ExecuteScalar();
 T ExecuteScalar<T>(T defaultValue);
 SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default);
