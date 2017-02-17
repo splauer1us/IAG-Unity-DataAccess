@@ -568,7 +568,8 @@ namespace Iag.Unity.DataAccess
                 .ToList()
                 .ForEach(prop =>
                 {
-                    var attr = prop.GetCustomAttribute<FieldToPropertyAttribute>();
+                    var attr = prop.GetCustomAttributes(true).OfType<FieldToPropertyAttribute>().FirstOrDefault();
+
                     if (attr == null
                         && !row.Table.Columns.Cast<DataColumn>().Any(col => sc.Equals(col.ColumnName, prop.Name))) return;
 
