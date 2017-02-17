@@ -16,7 +16,7 @@ namespace Unit_Tests
         [TestInitialize]
         public void Initialize()
         {
-            DataLibrary.Initialize("iagunity-dev.database.windows.net", "gts_Unitysystem", "unitysystem", "In$pired1");
+            DataLibrary.Initialize("<conn string>");
         }
 
         [TestMethod]
