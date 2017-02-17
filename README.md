@@ -71,7 +71,7 @@ using (UnitySqlCommand sp = new UnitySqlCommand("SELECT CAST('2015-12-12 12:12:1
 ```
 
 ### Utilizing the ```c#FieldToProperty``` attribute
-In this case, the target object class definition has properties decorated with ```[FieldToProperty('<fieldName>')]```.
+In this case, the target object class definition has properties decorated with ```c#[FieldToProperty('<fieldName>')```].
 ```c#
 public class TestLoadClassMapped
 {
