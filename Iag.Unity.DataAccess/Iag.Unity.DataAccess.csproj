@@ -48,6 +48,7 @@
     <Compile Include="ContextualSqlException.cs" />
     <Compile Include="DataLibrary.cs" />
     <Compile Include="Enumerations.cs" />
+    <Compile Include="FieldToPropertyAttribute.cs" />
     <Compile Include="IContextualException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="StoredProcedure.cs" />

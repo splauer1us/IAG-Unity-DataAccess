@@ -387,7 +387,7 @@ namespace Iag.Unity.DataAccess
             object val = ExecuteScalar();
             ExecuteTime = DateTime.Now.Subtract(start);
 
-            if ( val == null || val == DBNull.Value )
+            if (val == null || val == DBNull.Value)
                 return defaultValue;
             else
                 return (T)Convert.ChangeType(val, typeof(T));
@@ -519,12 +519,15 @@ namespace Iag.Unity.DataAccess
             }
         }
 
-        public IEnumerable<T> GetObjects<T>(bool strict = false) where T : class, new()
+        public IEnumerable<T> GetObjects<T>(Func<string, string> mapFunction = null, bool strict = false) where T : class, new()
         {
             return GetRows().ToList().Select(row =>
             {
                 T obj = Activator.CreateInstance<T>();
-                Fill<T>(obj, row, strict);
+                if (mapFunction != null)
+                    FillFromFunction<T>(obj, row, mapFunction);
+                else
+                    FillFromMapping<T>(obj, row, strict);
                 return obj;
             });
         }
@@ -536,31 +539,60 @@ namespace Iag.Unity.DataAccess
             return (!type.IsValueType || Nullable.GetUnderlyingType(type) != null);
         }
 
-        private void Fill<T>(T obj, DataRow row, bool strict) where T : class
+        private void FillFromFunction<T>(T obj, DataRow row, Func<string, string> mapFunction) where T : class
+        {
+            Type type = obj.GetType();
+            row.Table.Columns.Cast<DataColumn>().ToList().ForEach(col =>
+            {
+                var propName = mapFunction(col.ColumnName);
+                if (String.IsNullOrWhiteSpace(propName)) return;
+
+                var propInfo = type.GetProperty(propName);
+                if (propInfo == null)
+                {
+                    return;
+                    //throw new InvalidOperationException($"The property {propName} does not exist on type {type}.");
+                }
+
+                SetValue<T>(obj, row, propInfo, col.ColumnName);
+            });
+        }
+
+        private void FillFromMapping<T>(T obj, DataRow row, bool strict) where T : class
         {
             Type type = obj.GetType();
 
             var sc = strict ? StringComparer.CurrentCulture : StringComparer.CurrentCultureIgnoreCase;
 
             type.GetProperties()
-                .Where(prop => row.Table.Columns.Cast<DataColumn>().Any(col => sc.Equals(col.ColumnName, prop.Name))) // Only props that match
                 .ToList()
                 .ForEach(prop =>
                 {
-                    object value = row[prop.Name];
-                    if (value == DBNull.Value)
-                        value = null;
+                    var attr = prop.GetCustomAttribute<FieldToPropertyAttribute>();
+                    if (attr == null
+                        && !row.Table.Columns.Cast<DataColumn>().Any(col => sc.Equals(col.ColumnName, prop.Name))) return;
 
-                    object newValue = null;
+                    string fieldName = attr != null ? attr.FieldName : prop.Name;
 
-                    if (IsNullable(prop.PropertyType))
-                        newValue = (Nullable.GetUnderlyingType(prop.PropertyType) != null ? Convert.ChangeType(value, Nullable.GetUnderlyingType(prop.PropertyType)) : value);
-                    else
-                        newValue = Convert.ChangeType(value, prop.PropertyType);
-
-                    // This is what sets the class properties of the class
-                    prop.SetValue(obj, newValue, null);
+                    SetValue<T>(obj, row, prop, fieldName);
                 });
+        }
+
+        private void SetValue<T>(T obj, DataRow row, PropertyInfo prop, string fieldName) where T : class
+        {
+            object value = row[fieldName];
+            if (value == DBNull.Value)
+                value = null;
+
+            object newValue = null;
+
+            if (IsNullable(prop.PropertyType))
+                newValue = (Nullable.GetUnderlyingType(prop.PropertyType) != null && value != null ? Convert.ChangeType(value, Nullable.GetUnderlyingType(prop.PropertyType)) : value);
+            else
+                newValue = Convert.ChangeType(value, prop.PropertyType);
+
+            // This is what sets the class properties of the class
+            prop.SetValue(obj, newValue, null);
         }
 
 
