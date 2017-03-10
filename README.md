@@ -142,10 +142,11 @@ using (UnitySqlCommand cmd1 = new UnitySqlCommand("<Your sql statement>"))
 using (UnitySqlCommand cmd2 = new UnitySqlCommand("<Your sql statement>"))
 using (UnitySqlCommand cmd3 = new UnitySqlCommand("<Your sql statement>"))
 {
+    SqlTransaction trans = null;
     try
     {
          cmd1.Prepare();
-         SqlTransaction trans = cmd1.BeginTransaction();
+         trans = cmd1.BeginTransaction();
          cmd2.Prepare(trans); // Prepare with the transaction
          cmd3.Prepare(trans); // Prepare with the transaction
          
@@ -156,7 +157,7 @@ using (UnitySqlCommand cmd3 = new UnitySqlCommand("<Your sql statement>"))
     }
     catch
     {
-       trans.Rollback();
+       trans?.Rollback();
     }
 }
 ```
