@@ -164,10 +164,10 @@ using (UnitySqlCommand cmd3 = new UnitySqlCommand("<Your sql statement>"))
 
 Or utilize the CreateTransaction() method. This method will take all the commands/procedures passed to it and set them up with the same connection and into the same transaction.  DO NOT Prepare() after creating the transaction! The CreateTransaction() method will Prepare() for you. After the CreateTransaction(), you can set any parameters necessary.
 ```c#
-using (UnitySqlCommand cmd1 = new UnitySqlCommand("SELECT 1"))
-using (UnitySqlCommand cmd2 = new UnitySqlCommand("SELECT 2"))
-using (UnitySqlCommand cmd3 = new UnitySqlCommand("SELECT 3"))
-using (UnitySqlCommand cmd4 = new UnitySqlCommand("SELECT 4"))
+using (UnitySqlCommand cmd1 = new UnitySqlCommand("<Your sql statement>"))
+using (UnitySqlCommand cmd2 = new UnitySqlCommand("<Your sql statement>"))
+using (UnitySqlCommand cmd3 = new UnitySqlCommand("<Your sql statement>"))
+using (UnitySqlCommand cmd4 = new UnitySqlCommand("<Your sql statement>"))
 {
      SqlTransaction trans = null;
      try
