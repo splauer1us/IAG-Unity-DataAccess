@@ -597,6 +597,26 @@ namespace Iag.Unity.DataAccess
         }
 
 
+        public static SqlTransaction CreateTransaction(params StoredProcedure[] procedures)
+        {
+            SqlTransaction trans = null;
+            SqlConnection conn = null;
+            for (int x=0; x < procedures.Length; x++)
+            {
+                var procedure = procedures[0];
+                if (x == 0)
+                {
+                    trans = procedure.BeginTransaction();
+                    conn = procedure.Connection;
+                }
+                else
+                    procedure.Connection = conn;
+
+                procedure.Prepare(trans);
+            }
+            return trans;
+        }
+
         #region IDisposable Members
 
         public void Dispose()
