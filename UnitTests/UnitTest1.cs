@@ -16,7 +16,25 @@ namespace Unit_Tests
         [TestInitialize]
         public void Initialize()
         {
-            DataLibrary.Initialize("<conn string>");
+            DataLibrary.Initialize("Database=GTS_UnitySystem;Server=iagunity-dev.database.windows.net;User Id=unitysystem;Password=In$pired1");
+        }
+
+        [TestMethod]
+        public void TestTransactionCommit()
+        {
+            using (UnitySqlCommand cmd1 = new UnitySqlCommand("SELECT 1"))
+            using (UnitySqlCommand cmd2 = new UnitySqlCommand("SELECT 2"))
+            using (UnitySqlCommand cmd3 = new UnitySqlCommand("SELECT 3"))
+            using (UnitySqlCommand cmd4 = new UnitySqlCommand("SELECT 4"))
+            {
+                var trans = UnitySqlCommand.CreateTransaction(cmd1, cmd2, cmd3, cmd4);
+                cmd1.Execute();
+                cmd2.Execute();
+                cmd3.Execute();
+                cmd4.Execute();
+
+                trans.Rollback();
+            }
         }
 
         [TestMethod]
