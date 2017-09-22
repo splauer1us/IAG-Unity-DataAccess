@@ -519,15 +519,16 @@ namespace Iag.Unity.DataAccess
             }
         }
 
-        public IEnumerable<T> GetObjects<T>(Func<string, string> mapFunction = null, bool strict = false) where T : class, new()
+        public IEnumerable<T> GetObjects<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false) where T : class, new()
         {
             return GetRows().ToList().Select(row =>
             {
                 T obj = Activator.CreateInstance<T>();
+
                 if (mapFunction != null)
-                    FillFromFunction<T>(obj, row, mapFunction);
+                    FillFromFunction<T>(obj, row, mapFunction, translationAction);
                 else
-                    FillFromMapping<T>(obj, row, strict);
+                    FillFromMapping<T>(obj, row, strict, translationAction);
                 return obj;
             });
         }
@@ -539,7 +540,7 @@ namespace Iag.Unity.DataAccess
             return (!type.IsValueType || Nullable.GetUnderlyingType(type) != null);
         }
 
-        private void FillFromFunction<T>(T obj, DataRow row, Func<string, string> mapFunction) where T : class
+        private void FillFromFunction<T>(T obj, DataRow row, Func<string, string> mapFunction, Action<TranslationHandler> translationAction) where T : class
         {
             Type type = obj.GetType();
             row.Table.Columns.Cast<DataColumn>().ToList().ForEach(col =>
@@ -554,11 +555,17 @@ namespace Iag.Unity.DataAccess
                     //throw new InvalidOperationException($"The property {propName} does not exist on type {type}.");
                 }
 
-                SetValue<T>(obj, row, propInfo, col.ColumnName);
+                var th = new TranslationHandler(propInfo, row[col.ColumnName]);
+                if (translationAction != null)
+                    translationAction(th);
+                if (th.Handled)
+                    propInfo.SetValue(obj, th.TranslatedValue, null);
+                else
+                    SetValue<T>(obj, row, propInfo, col.ColumnName);
             });
         }
 
-        private void FillFromMapping<T>(T obj, DataRow row, bool strict) where T : class
+        private void FillFromMapping<T>(T obj, DataRow row, bool strict, Action<TranslationHandler> translationAction) where T : class
         {
             Type type = obj.GetType();
 
@@ -575,7 +582,13 @@ namespace Iag.Unity.DataAccess
 
                     string fieldName = attr != null ? attr.FieldName : prop.Name;
 
-                    SetValue<T>(obj, row, prop, fieldName);
+                    var th = new TranslationHandler(prop, row[fieldName]);
+                    if (translationAction != null)
+                        translationAction(th);
+                    if (th.Handled)
+                        prop.SetValue(obj, th.TranslatedValue, null);
+                    else
+                        SetValue<T>(obj, row, prop, fieldName);
                 });
         }
 
@@ -601,7 +614,7 @@ namespace Iag.Unity.DataAccess
         {
             SqlTransaction trans = null;
             SqlConnection conn = null;
-            for (int x=0; x < procedures.Length; x++)
+            for (int x = 0; x < procedures.Length; x++)
             {
                 var procedure = procedures[0];
                 if (x == 0)
