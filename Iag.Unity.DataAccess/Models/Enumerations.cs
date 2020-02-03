@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
-namespace Iag.Unity.Enumerations
+namespace Iag.Unity.Core.Enumerations
 {
     [Serializable]
     public enum SimpleDataType

@@ -1,4 +1,3 @@
-﻿using Iag.Unity.DataAccess.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -6,12 +5,12 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Iag.Unity.DataAccess.Exceptions;
 
 namespace Iag.Unity.DataAccess
 {
-    public class StoredProcedure : IDisposable
+    public abstract class BaseCommand : IDisposable
     {
-        private static string GetProcedureTextSql = "SELECT OBJECT_DEFINITION(OBJECT_ID(@ProcName, 'P')) AS objectText";
         private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.CurrentCultureIgnoreCase);
         private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.CurrentCultureIgnoreCase);
 
@@ -20,12 +19,12 @@ namespace Iag.Unity.DataAccess
         private bool isDisposed;
         private string procedureName;
         private int? returnValue;
-        private bool externalConnection = false;
+        protected bool externalConnection { get; set; } = false;
 
         public TimeSpan ExecuteTime { get; set; }
         public TimeSpan PrepareTime { get; set; }
 
-        private SqlConnection sqlConnection;
+        protected SqlConnection sqlConnection { get; set; }
         private SqlCommand sqlCommand;
 
         private List<SqlParameter> derivedParameters = new List<SqlParameter>();
@@ -91,12 +90,12 @@ namespace Iag.Unity.DataAccess
             }
         }
 
-        public StoredProcedure() : this(null, String.Empty) { }
+        public BaseCommand() : this(null, String.Empty) { }
 
-        public StoredProcedure(string procedureName)
+        public BaseCommand(string procedureName)
             : this(null, procedureName) { }
 
-        public StoredProcedure(SqlConnection connection, string procedureName)
+        public BaseCommand(SqlConnection connection, string procedureName)
         {
             this.procedureName = procedureName;
             if (connection == null)
@@ -136,7 +135,6 @@ namespace Iag.Unity.DataAccess
 
             if (!(this is UnitySqlCommand))
                 FillParameters(cmd);
-
 
             return cmd;
         }
@@ -393,89 +391,6 @@ namespace Iag.Unity.DataAccess
                 return (T)Convert.ChangeType(val, typeof(T));
         }
 
-        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
-        public int ExecuteScalar(int defaultValue = 0)
-        {
-            DateTime start = DateTime.Now;
-            object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
-
-            int output;
-            if (Int32.TryParse(Convert.ToString(val), out output))
-                return output;
-            else
-                return defaultValue;
-        }
-
-
-        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
-        public byte[] ExecuteScalar(byte[] defaultValue)
-        {
-            DateTime start = DateTime.Now;
-            object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
-
-            if (val is byte[])
-                return (byte[])val;
-            else
-                return defaultValue;
-        }
-
-
-        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
-        public string ExecuteScalar(string defaultValue = null)
-        {
-            DateTime start = DateTime.Now;
-            object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
-
-            if (val != DBNull.Value)
-                return Convert.ToString(val);
-            else
-                return defaultValue;
-        }
-
-        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
-        public bool ExecuteScalar(bool defaultValue = false)
-        {
-            DateTime start = DateTime.Now;
-            object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
-
-            if (val is bool)
-                return Convert.ToBoolean(val);
-            else
-                return defaultValue;
-        }
-
-        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
-        public DateTime? ExecuteScalar(DateTime? defaultValue = null)
-        {
-            DateTime start = DateTime.Now;
-            object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
-
-            if (val is DateTime)
-                return Convert.ToDateTime(val);
-            else
-                return defaultValue;
-        }
-
-        [Obsolete("This method is obsolete.  Use T ExecuteScalar<T>(T defaultValue) instead.")]
-        public long ExecuteScalar(long defaultValue = 0)
-        {
-            DateTime start = DateTime.Now;
-            object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
-
-            long output;
-
-            if (Int64.TryParse(Convert.ToString(val), out output))
-                return output;
-            else
-                return defaultValue;
-        }
-
         public SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             try
@@ -498,25 +413,10 @@ namespace Iag.Unity.DataAccess
             explicitParameterTypes[parameterName] = parameterType;
         }
 
-        public static string GetProcedureText(string procedureName, SqlConnection conn = null)
+        public T GetObject<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false) where T : class, new()
         {
-            bool externalConnection = conn != null;
-            try
-            {
-                if (conn == null)
-                    conn = DataLibrary.GetConnection();
-                using (UnitySqlCommand cmd = new UnitySqlCommand(conn, GetProcedureTextSql))
-                {
-                    cmd.Prepare();
-                    cmd.Parameters["@ProcName"] = procedureName;
-                    return cmd.ExecuteScalar<string>(String.Empty);
-                }
-            }
-            finally
-            {
-                if (externalConnection && conn != null)
-                    conn.Dispose();
-            }
+            var results = GetObjects<T>(mapFunction, translationAction, strict);
+            return results.FirstOrDefault();
         }
 
         public IEnumerable<T> GetObjects<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false) where T : class, new()
@@ -667,7 +567,7 @@ namespace Iag.Unity.DataAccess
         /// <summary>
         /// Finalizer for this class
         /// </summary>
-        ~StoredProcedure()
+        ~BaseCommand()
         {
             Dispose(false);
         }

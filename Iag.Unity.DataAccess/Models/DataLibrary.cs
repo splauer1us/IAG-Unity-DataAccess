@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Data.SqlClient;
-using System.Linq;
 using System.Text;
 using System.Data;
-using Iag.Unity.Enumerations;
+using Iag.Unity.Core.Enumerations;
 
 namespace Iag.Unity.DataAccess
 {
@@ -107,19 +105,19 @@ namespace Iag.Unity.DataAccess
                 case SqlDbType.SmallInt:
                 case SqlDbType.SmallMoney:
                 case SqlDbType.TinyInt:
-                    return Enumerations.SimpleDataType.Numeric;
+                    return SimpleDataType.Numeric;
                 case SqlDbType.Bit:
-                    return Enumerations.SimpleDataType.Boolean;
+                    return SimpleDataType.Boolean;
                 case SqlDbType.DateTime:
                 case SqlDbType.Date:
                 case SqlDbType.DateTime2:
                 case SqlDbType.DateTimeOffset:
                 case SqlDbType.SmallDateTime:
-                    return Enumerations.SimpleDataType.DateTime;
+                    return SimpleDataType.DateTime;
                 case SqlDbType.UniqueIdentifier:
-                    return Enumerations.SimpleDataType.Guid;
+                    return SimpleDataType.Guid;
                 default:
-                    return Enumerations.SimpleDataType.String;
+                    return SimpleDataType.String;
             }
         }
 

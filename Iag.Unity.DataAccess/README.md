@@ -1,6 +1,6 @@
 # IAG-Unity-DataAccess
 ## NuGet Package Page
-https://www.nuget.org/packages/Iag.Unity.DataAccess.dll/
+https://www.nuget.org/packages/Iag.Unity.DataAccess.Standard.dll
 
 ## First things first.  Initialize your data library:
 ```c#
@@ -57,6 +57,21 @@ using (UnitySqlCommand cmd = new UnitySqlCommand("<Your sql statement WHERE Id =
 
 ## Utilizing GetObject<T>()
 The GetObject<T>() function allows you to take a single table and convert them into a list of objects.  This is a simple implementation that currently does not support collection properties automatically filled with a child data.  There are ways the GetObject<T>() method can be used:
+### Simply mapping field name in the data table to property name
+This example assumes that the object to be loaded with data has exact matching of the field name to the property.  The method can be invoked using an optional parameter indicating whether to evaluate property and field names in a case-insensitive or case-sensitive manner.
+```c#
+using (UnitySqlCommand sp = new UnitySqlCommand("SELECT CAST('2015-12-12 12:12:12 -08:00' as datetimeoffset) as 'DateTimeOffsetValue', 'string' as StringValue, 123 as IntValue, 12.34 as DoubleValue, '2015-10-12 12:12:44' as DateTimeValue, 1 as BoolValue"))
+{
+	/// This implementation will evaluate field->property mapping in a case-insensitive manner.
+	var tlc1 = sp.GetObject<TestLoadClass>();
+	
+	/// This implementation will evaluate field->property mapping in a case-sensitive manner.
+	var tlc2 = sp.GetObject<TestLoadClass>(true);
+}
+```
+
+## Utilizing GetObjects<T>()
+The GetObjects<T>() function allows you to take a single table and convert them into a list of objects.  This is a simple implementation that currently does not support collection properties automatically filled with a child data.  There are ways the GetObjects<T>() method can be used:
 ### Simply mapping field name in the data table to property name
 This example assumes that the object to be loaded with data has exact matching of the field name to the property.  The method can be invoked using an optional parameter indicating whether to evaluate property and field names in a case-insensitive or case-sensitive manner.
 ```c#
