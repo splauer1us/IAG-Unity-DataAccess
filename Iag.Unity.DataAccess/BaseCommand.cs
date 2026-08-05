@@ -12,6 +12,7 @@ namespace Iag.Unity.DataAccess
     {
         private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, SqlParameter> declaredParameters = new Dictionary<string, SqlParameter>(StringComparer.OrdinalIgnoreCase);
 
         private int timeout = 300;
         private bool isPrepared;
@@ -298,9 +299,26 @@ namespace Iag.Unity.DataAccess
             }
             else
             {
+                // No derived metadata: send explicitly-declared parameters (output/return/typed)
+                // first, then any remaining plain input values from the Parameters dictionary.
+                foreach (KeyValuePair<string, SqlParameter> kvp in this.declaredParameters)
+                {
+                    SqlParameter parm = (SqlParameter)((ICloneable)kvp.Value).Clone();
+                    if (parameters.ContainsKey(kvp.Key))
+                    {
+                        // A value was supplied for a declared output => make it input/output.
+                        parm.Value = parameters[kvp.Key] ?? (object)DBNull.Value;
+                        if (parm.Direction == ParameterDirection.Output)
+                            parm.Direction = ParameterDirection.InputOutput;
+                    }
+                    this.sqlCommand.Parameters.Add(parm);
+                }
+
                 foreach (KeyValuePair<string, object> kvp in this.Parameters)
                 {
-                    this.sqlCommand.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                    if (this.declaredParameters.ContainsKey(kvp.Key))
+                        continue;
+                    this.sqlCommand.Parameters.AddWithValue(kvp.Key, kvp.Value ?? (object)DBNull.Value);
                 }
             }
 
@@ -510,6 +528,47 @@ namespace Iag.Unity.DataAccess
         public void SetParameterType(string parameterName, SqlDbType parameterType)
         {
             explicitParameterTypes[parameterName] = parameterType;
+        }
+
+        /// <summary>
+        /// Declares a parameter with an explicit type and direction so it can be sent to the
+        /// server without calling <see cref="Prepare()"/> (which would derive metadata from a
+        /// round-trip). Output/return values are read back after execution via
+        /// <see cref="Parameters"/> and <see cref="ReturnValue"/> respectively. Returns the
+        /// underlying <see cref="SqlParameter"/> so callers can set precision, scale, etc.
+        /// </summary>
+        public SqlParameter DeclareParameter(string parameterName, SqlDbType type, ParameterDirection direction, int size = 0)
+        {
+            var parm = new SqlParameter
+            {
+                ParameterName = parameterName,
+                SqlDbType = type,
+                Direction = direction
+            };
+            if (size > 0)
+                parm.Size = size;
+
+            declaredParameters[parameterName] = parm;
+            return parm;
+        }
+
+        /// <summary>
+        /// Declares an OUTPUT parameter. Read the result after execution from
+        /// <see cref="Parameters"/>[parameterName]. Seeding a value via
+        /// <see cref="Parameters"/> promotes it to INPUT/OUTPUT automatically.
+        /// </summary>
+        public SqlParameter AddOutputParameter(string parameterName, SqlDbType type, int size = 0)
+        {
+            return DeclareParameter(parameterName, type, ParameterDirection.Output, size);
+        }
+
+        /// <summary>
+        /// Declares the procedure's RETURN value parameter. Read the result after execution
+        /// from <see cref="ReturnValue"/>.
+        /// </summary>
+        public SqlParameter AddReturnParameter(string parameterName = "@RETURN_VALUE")
+        {
+            return DeclareParameter(parameterName, SqlDbType.Int, ParameterDirection.ReturnValue);
         }
 
         public T GetObject<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false) where T : class, new()

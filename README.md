@@ -84,6 +84,26 @@ using (var sp = new StoredProcedure("dbo.CreateOrder"))
 
 Derived parameter metadata is cached per server/database/procedure, so repeated `Prepare()` calls avoid additional round-trips. A cache entry is automatically invalidated if a command using it fails, so a changed procedure signature self-heals on the next call.
 
+### Output & return-value parameters without `Prepare()`
+
+To capture outputs on the fast path, declare them explicitly and read them back through the normal channels:
+
+```csharp
+using (var sp = new StoredProcedure("dbo.CreateOrder"))
+{
+    sp.Parameters["@CustomerId"] = 123;                  // input
+    sp.AddOutputParameter("@NewOrderId", SqlDbType.Int); // output
+    sp.AddReturnParameter();                             // return value
+
+    sp.Execute();
+
+    int newId = (int)sp.Parameters["@NewOrderId"];       // output → Parameters
+    int code  = sp.ReturnValue ?? 0;                     // return → ReturnValue
+}
+```
+
+Seeding a value for a declared output parameter promotes it to `InputOutput` automatically. `DeclareParameter(name, type, direction, size)` is the general form if you need a specific direction or size.
+
 ## Transactions
 
 ```csharp

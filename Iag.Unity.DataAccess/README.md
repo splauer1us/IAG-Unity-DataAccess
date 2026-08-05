@@ -37,6 +37,23 @@ using (StoredProcedure sp = new StoredProcedure("<Your procedure name>"))
 ```
 
 
+## Output and return-value parameters
+Call `Prepare()` to derive parameter directions and types from the server automatically. If you would rather skip that round-trip, declare output and return-value parameters explicitly with `AddOutputParameter()` and `AddReturnParameter()` (or the general `DeclareParameter()`). Read the results back after execution from `Parameters[name]` and `ReturnValue`.
+```c#
+using (StoredProcedure sp = new StoredProcedure("dbo.CreateOrder"))
+{
+     sp.Parameters["@CustomerId"] = 123;                 // input
+     sp.AddOutputParameter("@NewOrderId", SqlDbType.Int); // output
+     sp.AddReturnParameter();                             // return value
+
+     sp.Execute();
+
+     int newId = (int)sp.Parameters["@NewOrderId"];       // read output
+     int code  = sp.ReturnValue ?? 0;                     // read return value
+}
+```
+Seeding a value for a declared output parameter (via `Parameters[name]`) promotes it to `InputOutput` automatically.
+
 ## Executing a sql command without parameters (returning a single table):
 ```c#
 using (UnitySqlCommand cmd = new UnitySqlCommand("<Your sql statement>"))
