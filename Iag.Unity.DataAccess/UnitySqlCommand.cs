@@ -1,5 +1,4 @@
-using System;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace Iag.Unity.DataAccess
 {
@@ -10,7 +9,7 @@ namespace Iag.Unity.DataAccess
         public UnitySqlCommand(string procedureName)
             : this(null, procedureName) { }
 
-        public UnitySqlCommand(SqlConnection connection, string commandText): base(connection, commandText)
+        public UnitySqlCommand(SqlConnection connection, string commandText) : base(connection, commandText)
         {
         }
     }

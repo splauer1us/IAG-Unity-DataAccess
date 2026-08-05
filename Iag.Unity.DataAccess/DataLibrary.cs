@@ -1,16 +1,12 @@
-using System;
-using System.Data.SqlClient;
-using System.Text;
-using System.Data;
 using Iag.Unity.Core.Enumerations;
+using Microsoft.Data.SqlClient;
+using System.Data;
+using System.Text;
 
 namespace Iag.Unity.DataAccess
 {
     public static class DataLibrary
     {
-        public static object sqlVersionLock = new object();
-        public static string _sqlVersionText = String.Empty;
-
         public static string ConnectionString { get; set; }
         public static bool IsInitialized { get; set; }
         public static Action<Exception> LoggingCallback { get; set; }
@@ -18,12 +14,10 @@ namespace Iag.Unity.DataAccess
         {
             try
             {
-                LoggingCallback = loggingCallback ?? ((ex)=>{ });
+                LoggingCallback = loggingCallback ?? ((ex) => { });
                 DataLibrary.ConnectionString = connectionString;
-                lock (sqlVersionLock)
-                    _sqlVersionText = null;
 
-                //Test the connection. 
+                //Test the connection.
                 using (SqlConnection conn = GetConnection())
                 {
                     IsInitialized = true;
@@ -47,7 +41,7 @@ namespace Iag.Unity.DataAccess
             var innerException = ex.InnerException;
             int counter = 1;
 
-            while ((innerException != null) || (counter > 20))
+            while ((innerException != null) && (counter < 20))
             {
                 builder
                     .AppendLine()
@@ -64,7 +58,7 @@ namespace Iag.Unity.DataAccess
             return builder.ToString();
         }
 
-        public static System.Data.SqlClient.SqlConnection GetConnection(bool doNotOpen = false)
+        public static SqlConnection GetConnection(bool doNotOpen = false)
         {
             if (String.IsNullOrWhiteSpace(DataLibrary.ConnectionString))
                 throw new InvalidOperationException("Unable to retrieve default connection.  The DataLibrary has not been initialized.");

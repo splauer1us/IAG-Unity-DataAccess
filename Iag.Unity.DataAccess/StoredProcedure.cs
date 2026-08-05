@@ -1,8 +1,8 @@
-using System;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
-namespace Iag.Unity.DataAccess{
-    public class StoredProcedure: BaseCommand
+namespace Iag.Unity.DataAccess
+{
+    public class StoredProcedure : BaseCommand
     {
         private static string GetProcedureTextSql = "SELECT OBJECT_DEFINITION(OBJECT_ID(@ProcName, 'P')) AS objectText";
 
@@ -22,7 +22,7 @@ namespace Iag.Unity.DataAccess{
             }
             finally
             {
-                if (externalConnection && conn != null)
+                if (!externalConnection && conn != null)
                     conn.Dispose();
             }
         }
@@ -32,7 +32,7 @@ namespace Iag.Unity.DataAccess{
         public StoredProcedure(string procedureName)
             : this(null, procedureName) { }
 
-        public StoredProcedure(SqlConnection connection, string procedureName): base(connection, procedureName)
+        public StoredProcedure(SqlConnection connection, string procedureName) : base(connection, procedureName)
         {
 
         }

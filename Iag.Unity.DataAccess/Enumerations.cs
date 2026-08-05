@@ -1,5 +1,3 @@
-using System;
-
 namespace Iag.Unity.Core.Enumerations
 {
     [Serializable]

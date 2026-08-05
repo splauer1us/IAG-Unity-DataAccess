@@ -1,18 +1,17 @@
-using System;
-using System.Collections.Generic;
+using Iag.Unity.DataAccess.Exceptions;
+using Microsoft.Data.SqlClient;
+using System.Collections.Concurrent;
 using System.Data;
-using System.Data.SqlClient;
-using System.Linq;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
-using Iag.Unity.DataAccess.Exceptions;
 
 namespace Iag.Unity.DataAccess
 {
     public abstract class BaseCommand : IDisposable
     {
-        private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.CurrentCultureIgnoreCase);
-        private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.CurrentCultureIgnoreCase);
+        private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.OrdinalIgnoreCase);
 
         private int timeout = 300;
         private bool isPrepared;
@@ -28,6 +27,13 @@ namespace Iag.Unity.DataAccess
         private SqlCommand sqlCommand;
 
         private List<SqlParameter> derivedParameters = new List<SqlParameter>();
+        private string parameterCacheKey;
+
+        // Cache of derived stored-procedure parameter templates, keyed by data source + database + procedure.
+        // The templates are never mutated or attached to a live command — each command gets its own clones —
+        // and an entry is evicted whenever a command using it fails (InvalidateParameterCache).
+        private static readonly ConcurrentDictionary<string, List<SqlParameter>> derivedParameterCache
+            = new ConcurrentDictionary<string, List<SqlParameter>>(StringComparer.OrdinalIgnoreCase);
 
         public List<SqlParameter> DerivedParameters
         {
@@ -116,22 +122,40 @@ namespace Iag.Unity.DataAccess
 
         public void Prepare(SqlTransaction trans)
         {
-            DateTime start = DateTime.Now;
+            var start = Stopwatch.StartNew();
             if (sqlConnection == null)
                 throw new InvalidOperationException("The sql connection is null.");
             if (this.sqlCommand == null || (this.sqlCommand.Transaction == null && trans != null) || (this.sqlCommand.Transaction != null && trans == null))
                 this.sqlCommand = GetCommand(procedureName, this.sqlConnection, trans);
 
             isPrepared = true;
-            PrepareTime = DateTime.Now.Subtract(start);
+            PrepareTime = start.Elapsed;
         }
 
-        private SqlCommand GetCommand(string procedureName, SqlConnection sqlConnection, SqlTransaction transaction)
+        // Ensures a SqlCommand exists WITHOUT deriving parameters from the server. This lets
+        // callers execute a stored procedure with manually-supplied parameters (or none) without
+        // paying for a Prepare()/DeriveParameters round-trip. Call Prepare() explicitly when you
+        // want derived parameter metadata (exact types/sizes and output/return values).
+        private void EnsureCommand()
+        {
+            if (sqlConnection == null)
+                throw new InvalidOperationException("The sql connection is null.");
+            if (this.sqlCommand == null)
+                this.sqlCommand = BuildCommand(procedureName, this.sqlConnection, null);
+        }
+
+        private SqlCommand BuildCommand(string procedureName, SqlConnection sqlConnection, SqlTransaction transaction)
         {
             SqlCommand cmd = new SqlCommand(procedureName, sqlConnection, transaction);
             cmd.CommandType = (this is UnitySqlCommand ? CommandType.Text : CommandType.StoredProcedure);
             cmd.CommandTimeout = timeout;
             cmd.Parameters.Clear();
+            return cmd;
+        }
+
+        private SqlCommand GetCommand(string procedureName, SqlConnection sqlConnection, SqlTransaction transaction)
+        {
+            SqlCommand cmd = BuildCommand(procedureName, sqlConnection, transaction);
 
             if (!(this is UnitySqlCommand))
                 FillParameters(cmd);
@@ -142,33 +166,88 @@ namespace Iag.Unity.DataAccess
         private void FillParameters(SqlCommand command)
         {
             OpenConnection();
-            SqlCommandBuilder.DeriveParameters(command);
 
-            this.parameters = new Dictionary<string, object>(StringComparer.CurrentCultureIgnoreCase);
-            foreach (SqlParameter parm in command.Parameters)
+            this.parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            this.parameterCacheKey = BuildParameterCacheKey(command);
+
+            if (derivedParameterCache.TryGetValue(this.parameterCacheKey, out List<SqlParameter> cachedTemplates))
             {
-                this.derivedParameters.Add(parm);
+                // Cache hit: no server round-trip. Give this instance its own clones so the
+                // cached templates are never mutated or attached to a live command.
+                this.derivedParameters = CloneParameters(cachedTemplates);
             }
+            else
+            {
+                // Cache miss: derive from the server (one round-trip), then cache pristine clones.
+                try
+                {
+                    SqlCommandBuilder.DeriveParameters(command);
+                }
+                catch
+                {
+                    InvalidateParameterCache();
+                    throw;
+                }
+
+                this.derivedParameters = new List<SqlParameter>(command.Parameters.Count);
+                foreach (SqlParameter parm in command.Parameters)
+                    this.derivedParameters.Add(parm);
+
+                derivedParameterCache[this.parameterCacheKey] = CloneParameters(this.derivedParameters);
+            }
+
+            // Reflect the derived parameters on the command regardless of cache hit/miss.
+            command.Parameters.Clear();
+            foreach (SqlParameter parm in this.derivedParameters)
+                command.Parameters.Add(parm);
+        }
+
+        private string BuildParameterCacheKey(SqlCommand command)
+        {
+            SqlConnection conn = command.Connection;
+            string dataSource = conn != null ? conn.DataSource : String.Empty;
+            string database = conn != null ? conn.Database : String.Empty;
+            return String.Concat(dataSource, "|", database, "|", this.procedureName);
+        }
+
+        private static List<SqlParameter> CloneParameters(IEnumerable<SqlParameter> source)
+        {
+            var clones = new List<SqlParameter>();
+            foreach (SqlParameter parm in source)
+                clones.Add((SqlParameter)((ICloneable)parm).Clone());
+            return clones;
+        }
+
+        private void InvalidateParameterCache()
+        {
+            string key = this.parameterCacheKey;
+            if (!String.IsNullOrEmpty(key))
+                derivedParameterCache.TryRemove(key, out _);
         }
 
         public void Execute()
         {
             try
             {
-                DateTime start = DateTime.Now;
-                if (!isPrepared)
-                    Prepare();
+                var start = Stopwatch.StartNew();
+                EnsureCommand();
 
                 OpenConnection();
                 TransferParameters();
 
                 this.sqlCommand.ExecuteNonQuery();
                 TransferParametersPost();
-                ExecuteTime = DateTime.Now.Subtract(start);
+                ExecuteTime = start.Elapsed;
             }
             catch (SqlException ex)
             {
+                InvalidateParameterCache();
                 throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
             }
         }
 
@@ -207,7 +286,7 @@ namespace Iag.Unity.DataAccess
         private void TransferParameters()
         {
             this.sqlCommand.Parameters.Clear();
-            if (!(this is UnitySqlCommand))
+            if (!(this is UnitySqlCommand) && derivedParameters != null && derivedParameters.Any())
             {
                 foreach (SqlParameter dparm in derivedParameters)
                 {
@@ -273,10 +352,9 @@ namespace Iag.Unity.DataAccess
         {
             try
             {
-                if (!isPrepared)
-                    Prepare();
+                EnsureCommand();
 
-                DateTime start = DateTime.Now;
+                var start = Stopwatch.StartNew();
                 TransferParameters();
 
                 OpenConnection();
@@ -284,13 +362,19 @@ namespace Iag.Unity.DataAccess
                 DataSet ds = String.IsNullOrWhiteSpace(name) ? new DataSet() : new DataSet(name);
                 da.Fill(ds);
                 TransferParametersPost();
-                ExecuteTime = DateTime.Now.Subtract(start);
+                ExecuteTime = start.Elapsed;
 
                 return ds;
             }
             catch (SqlException ex)
             {
+                InvalidateParameterCache();
                 throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
             }
         }
 
@@ -343,8 +427,7 @@ namespace Iag.Unity.DataAccess
         {
             try
             {
-                if (!isPrepared)
-                    Prepare();
+                EnsureCommand();
                 TransferParameters();
 
                 OpenConnection();
@@ -352,7 +435,13 @@ namespace Iag.Unity.DataAccess
             }
             catch (SqlException ex)
             {
+                InvalidateParameterCache();
                 throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
             }
         }
 
@@ -360,30 +449,35 @@ namespace Iag.Unity.DataAccess
         {
             try
             {
-                if (!isPrepared)
-                    Prepare();
+                EnsureCommand();
                 TransferParameters();
 
                 OpenConnection();
 
-                DateTime start = DateTime.Now;
+                var start = Stopwatch.StartNew();
                 object ret = this.sqlCommand.ExecuteScalar();
                 TransferParametersPost();
-                ExecuteTime = DateTime.Now.Subtract(start);
+                ExecuteTime = start.Elapsed;
 
                 return ret;
             }
             catch (SqlException ex)
             {
+                InvalidateParameterCache();
                 throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
             }
         }
 
         public T ExecuteScalar<T>(T defaultValue)
         {
-            DateTime start = DateTime.Now;
+            var start = Stopwatch.StartNew();
             object val = ExecuteScalar();
-            ExecuteTime = DateTime.Now.Subtract(start);
+            ExecuteTime = start.Elapsed;
 
             if (val == null || val == DBNull.Value)
                 return defaultValue;
@@ -395,8 +489,7 @@ namespace Iag.Unity.DataAccess
         {
             try
             {
-                if (!isPrepared)
-                    Prepare();
+                EnsureCommand();
                 TransferParameters();
 
                 OpenConnection();
@@ -404,7 +497,13 @@ namespace Iag.Unity.DataAccess
             }
             catch (SqlException ex)
             {
+                InvalidateParameterCache();
                 throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
             }
         }
 
@@ -421,75 +520,71 @@ namespace Iag.Unity.DataAccess
 
         public IEnumerable<T> GetObjects<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false) where T : class, new()
         {
-            return GetRows().ToList().Select(row =>
+            DataTable table = OpenTable();
+
+            // Build the column->property plan once, not once per row.
+            List<PropertyMapping> plan = BuildMappingPlan<T>(table, mapFunction, strict);
+
+            var results = new List<T>(table.Rows.Count);
+            foreach (DataRow row in table.Rows)
             {
                 T obj = Activator.CreateInstance<T>();
-
-                if (mapFunction != null)
-                    FillFromFunction<T>(obj, row, mapFunction, translationAction);
-                else
-                    FillFromMapping<T>(obj, row, strict, translationAction);
-                return obj;
-            });
-        }
-
-
-        // http://stackoverflow.com/questions/374651/how-to-check-if-an-object-is-nullable
-        private bool IsNullable(Type type)
-        {
-            return (!type.IsValueType || Nullable.GetUnderlyingType(type) != null);
-        }
-
-        private void FillFromFunction<T>(T obj, DataRow row, Func<string, string> mapFunction, Action<TranslationHandler> translationAction) where T : class
-        {
-            Type type = obj.GetType();
-            row.Table.Columns.Cast<DataColumn>().ToList().ForEach(col =>
-            {
-                var propName = mapFunction(col.ColumnName);
-                if (String.IsNullOrWhiteSpace(propName)) return;
-
-                var propInfo = type.GetProperty(propName);
-                if (propInfo == null)
+                foreach (PropertyMapping map in plan)
                 {
-                    return;
-                    //throw new InvalidOperationException($"The property {propName} does not exist on type {type}.");
-                }
-
-                var th = new TranslationHandler(propInfo, row[col.ColumnName]);
-                if (translationAction != null)
-                    translationAction(th);
-                if (th.Handled)
-                    propInfo.SetValue(obj, th.TranslatedValue, null);
-                else
-                    SetValue<T>(obj, row, propInfo, col.ColumnName);
-            });
-        }
-
-        private void FillFromMapping<T>(T obj, DataRow row, bool strict, Action<TranslationHandler> translationAction) where T : class
-        {
-            Type type = obj.GetType();
-
-            var sc = strict ? StringComparer.CurrentCulture : StringComparer.CurrentCultureIgnoreCase;
-
-            type.GetProperties()
-                .ToList()
-                .ForEach(prop =>
-                {
-                    var attr = prop.GetCustomAttributes(true).OfType<FieldToPropertyAttribute>().FirstOrDefault();
-
-                    if (attr == null
-                        && !row.Table.Columns.Cast<DataColumn>().Any(col => sc.Equals(col.ColumnName, prop.Name))) return;
-
-                    string fieldName = attr != null ? attr.FieldName : prop.Name;
-
-                    var th = new TranslationHandler(prop, row[fieldName]);
+                    var th = new TranslationHandler(map.Property, row[map.FieldName]);
                     if (translationAction != null)
                         translationAction(th);
                     if (th.Handled)
-                        prop.SetValue(obj, th.TranslatedValue, null);
+                        map.Property.SetValue(obj, th.TranslatedValue, null);
                     else
-                        SetValue<T>(obj, row, prop, fieldName);
-                });
+                        SetValue(obj, row, map.Property, map.FieldName);
+                }
+                results.Add(obj);
+            }
+            return results;
+        }
+
+        private sealed class PropertyMapping
+        {
+            public string FieldName;
+            public PropertyInfo Property;
+        }
+
+        private static List<PropertyMapping> BuildMappingPlan<T>(DataTable table, Func<string, string> mapFunction, bool strict) where T : class
+        {
+            Type type = typeof(T);
+            var plan = new List<PropertyMapping>();
+
+            if (mapFunction != null)
+            {
+                // Caller maps each column name to a property name.
+                foreach (DataColumn col in table.Columns)
+                {
+                    var propName = mapFunction(col.ColumnName);
+                    if (String.IsNullOrWhiteSpace(propName)) continue;
+
+                    var prop = type.GetProperty(propName);
+                    if (prop == null) continue;
+
+                    plan.Add(new PropertyMapping { FieldName = col.ColumnName, Property = prop });
+                }
+            }
+            else
+            {
+                // Match by [FieldToProperty] attribute, or by property name against the columns.
+                var sc = strict ? StringComparer.CurrentCulture : StringComparer.CurrentCultureIgnoreCase;
+                var columnNames = new HashSet<string>(table.Columns.Cast<DataColumn>().Select(c => c.ColumnName), sc);
+
+                foreach (var prop in type.GetProperties())
+                {
+                    var attr = prop.GetCustomAttributes(true).OfType<FieldToPropertyAttribute>().FirstOrDefault();
+                    if (attr == null && !columnNames.Contains(prop.Name)) continue;
+
+                    plan.Add(new PropertyMapping { FieldName = attr != null ? attr.FieldName : prop.Name, Property = prop });
+                }
+            }
+
+            return plan;
         }
 
         private void SetValue<T>(T obj, DataRow row, PropertyInfo prop, string fieldName) where T : class
@@ -498,12 +593,22 @@ namespace Iag.Unity.DataAccess
             if (value == DBNull.Value)
                 value = null;
 
-            object newValue = null;
+            Type propType = prop.PropertyType;
+            Type underlying = Nullable.GetUnderlyingType(propType);
 
-            if (IsNullable(prop.PropertyType))
-                newValue = (Nullable.GetUnderlyingType(prop.PropertyType) != null && value != null ? Convert.ChangeType(value, Nullable.GetUnderlyingType(prop.PropertyType)) : value);
+            object newValue;
+            if (value == null)
+            {
+                // A non-nullable value type can't take null; leave it at its default.
+                if (propType.IsValueType && underlying == null)
+                    return;
+                newValue = null;
+            }
             else
-                newValue = Convert.ChangeType(value, prop.PropertyType);
+            {
+                Type target = underlying ?? propType;
+                newValue = target.IsInstanceOfType(value) ? value : Convert.ChangeType(value, target);
+            }
 
             // This is what sets the class properties of the class
             prop.SetValue(obj, newValue, null);
@@ -516,7 +621,7 @@ namespace Iag.Unity.DataAccess
             SqlConnection conn = null;
             for (int x = 0; x < procedures.Length; x++)
             {
-                var procedure = procedures[0];
+                var procedure = procedures[x];
                 if (x == 0)
                 {
                     trans = procedure.BeginTransaction();
@@ -534,42 +639,19 @@ namespace Iag.Unity.DataAccess
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private void Dispose(bool disposing)
-        {
-            if (!this.isDisposed)
-            {
-                if (disposing)
-                {
-                    DisposeObjects();
-                }
-            }
-            this.isDisposed = true;
-        }
-
-        private void DisposeObjects()
-        {
+            if (this.isDisposed)
+                return;
 
             if (this.sqlCommand != null)
                 this.sqlCommand.Dispose();
 
-            //only dispose of connection if we created it
+            // only dispose of the connection if we created it
             if (this.sqlConnection != null && !externalConnection)
-            {
                 this.sqlConnection.Dispose();
-            }
+
+            this.isDisposed = true;
         }
 
         #endregion
-        /// <summary>
-        /// Finalizer for this class
-        /// </summary>
-        ~BaseCommand()
-        {
-            Dispose(false);
-        }
     }
 }

@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29728.190
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36221.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Iag.Unity.DataAccess", "Iag.Unity.DataAccess\Iag.Unity.DataAccess.csproj", "{73B494AA-88B9-4A89-B382-3C5A8585C915}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Iag.Unity.DataAccess", "Iag.Unity.DataAccess\Iag.Unity.DataAccess.csproj", "{61BAD790-E543-474A-86D9-B683107D95A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,15 +11,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{73B494AA-88B9-4A89-B382-3C5A8585C915}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{73B494AA-88B9-4A89-B382-3C5A8585C915}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{73B494AA-88B9-4A89-B382-3C5A8585C915}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{73B494AA-88B9-4A89-B382-3C5A8585C915}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61BAD790-E543-474A-86D9-B683107D95A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61BAD790-E543-474A-86D9-B683107D95A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61BAD790-E543-474A-86D9-B683107D95A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61BAD790-E543-474A-86D9-B683107D95A6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {4909B983-FBD9-4ABD-8B21-1D3D10A82F7F}
+		SolutionGuid = {32892504-4361-4C2D-AFB5-956B2A3C9513}
 	EndGlobalSection
 EndGlobal

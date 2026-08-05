@@ -1,64 +1,42 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{73B494AA-88B9-4A89-B382-3C5A8585C915}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Iag.Unity.DataAccess</RootNamespace>
-    <AssemblyName>Iag.Unity.DataAccess</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Deterministic>true</Deterministic>
-    <TargetFrameworkProfile />
+    <TargetFrameworks>netstandard2.0;net462;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+  <!-- Identity (decoupled from the .net8 csproj file name) -->
+  <AssemblyName>Iag.Unity.DataAccess</AssemblyName>
+  <RootNamespace>Iag.Unity.DataAccess</RootNamespace>
+
+  <!-- NuGet metadata -->
+  <PackageId>Iag.Unity.DataAccess.dll</PackageId>
+  <PackageReadmeFile>README.md</PackageReadmeFile>
+  <Authors>Steve Lauer</Authors>
+  <Company></Company>
+  <Description>Data access library that simplifies data access to a Microsoft SQL Server. Wraps SqlConnection and SqlCommand in a series of objects and methods that provide more straightforward usage. Multi-targets .NET Framework 4.6.2, .NET Standard 2.0, and .NET 8.0.</Description>
+  <PackageLicenseExpression>MIT</PackageLicenseExpression> <!-- or use a <PackageLicenseFile> -->
+  <RepositoryUrl>https://github.com/splauer1us/IAG-Unity-DataAccess</RepositoryUrl>
+
+  <!-- Versioning -->
+  <Version>2.0.1</Version>
+  <AssemblyVersion>2.0.1.0</AssemblyVersion>
+  <FileVersion>2.0.1.0</FileVersion>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
+  
+
+
+
+
+
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="Models\BaseCommand.cs" />
-    <Compile Include="Models\ContextualSqlException.cs" />
-    <Compile Include="Models\DataLibrary.cs" />
-    <Compile Include="Models\Enumerations.cs" />
-    <Compile Include="Models\FieldToPropertyAttribute.cs" />
-    <Compile Include="Models\IContextualException.cs" />
-    <Compile Include="Models\StoredProcedure.cs" />
-    <Compile Include="Models\TransactionHandler.cs" />
-    <Compile Include="Models\UnitySqlCommand.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include=".gitignore" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="LICENSE" />
-    <None Include="README.md" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
 </Project>
