@@ -157,6 +157,33 @@ T ExecuteScalar<T>(T defaultValue);
 SqlDataReader ExecuteReader(CommandBehavior commandBehavior = CommandBehavior.Default);
 ```
 
+## Async execution
+Every command-executing method has an `...Async` counterpart taking an optional `CancellationToken`. They open the connection with `OpenAsync` and read result sets with `ExecuteReaderAsync`/`ReadAsync`, so the row fetch is genuinely non-blocking (the sync methods use `SqlDataAdapter.Fill`, which has no async form).
+```c#
+Task ExecuteAsync(CancellationToken cancellationToken = default);
+Task<DataSet> OpenDataSetAsync(string name = null, CancellationToken cancellationToken = default);
+Task<DataTable> OpenTableAsync(string name = null, CancellationToken cancellationToken = default);
+Task<IEnumerable<DataRow>> GetRowsAsync(CancellationToken cancellationToken = default);
+Task<IEnumerable<IEnumerable<DataRow>>> GetRowSetsAsync(CancellationToken cancellationToken = default);
+Task<object> ExecuteScalarAsync(CancellationToken cancellationToken = default);
+Task<T> ExecuteScalarAsync<T>(T defaultValue, CancellationToken cancellationToken = default);
+Task<SqlDataReader> ExecuteReaderAsync(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
+Task<SqlDataReader> GetDataReaderAsync(CancellationToken cancellationToken = default);
+Task<T> GetObjectAsync<T>(...);
+Task<IEnumerable<T>> GetObjectsAsync<T>(...);
+```
+```c#
+using (StoredProcedure sp = new StoredProcedure("dbo.GetCustomers"))
+{
+     DataTable tbl = await sp.OpenTableAsync();
+     List<Customer> customers = (await sp.GetObjectsAsync<Customer>()).ToList();
+}
+```
+On **.NET 8.0**, commands also implement `IAsyncDisposable` and may be used with `await using`. `Prepare()` and the transaction methods stay synchronous (`SqlCommandBuilder.DeriveParameters` has no async API), but async execute methods run fine inside a synchronously-begun transaction.
+
+## Error context and sensitive data
+When a command fails, `ContextualSqlException.Context` includes the command text plus parameter **names and types**. Parameter *values* are omitted by default (they often carry PII, tokens, or credentials). Opt in with `DataLibrary.IncludeParameterValuesInErrors = true`.
+
 The following calls have been marked [Obsolete].  Use ```ExecuteScalar<T>()``` instead.
 ```c#
 bool ExecuteScalar(bool defaultValue = false);
@@ -169,6 +196,7 @@ string ExecuteScalar(string defaultValue = null);
 ```
 
 ## Executing within a transaction
+`BeginTransaction()` uses `IsolationLevel.ReadCommitted` by default; use the `BeginTransaction(IsolationLevel)` overload for a stricter level.
 ```c#
 using (UnitySqlCommand cmd1 = new UnitySqlCommand("<Your sql statement>"))
 using (UnitySqlCommand cmd2 = new UnitySqlCommand("<Your sql statement>"))

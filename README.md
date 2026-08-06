@@ -104,6 +104,33 @@ using (var sp = new StoredProcedure("dbo.CreateOrder"))
 
 Seeding a value for a declared output parameter promotes it to `InputOutput` automatically. `DeclareParameter(name, type, direction, size)` is the general form if you need a specific direction or size.
 
+## Async
+
+Every command-executing method has an `...Async` counterpart that accepts an optional `CancellationToken`. They perform genuine asynchronous I/O — the connection is opened with `OpenAsync`, and result sets are read with `ExecuteReaderAsync`/`ReadAsync` (not a blocking `SqlDataAdapter.Fill`).
+
+```csharp
+using (var sp = new StoredProcedure("dbo.GetCustomers"))
+{
+    List<Customer> customers = (await sp.GetObjectsAsync<Customer>(cancellationToken: ct)).ToList();
+}
+```
+
+| Sync | Async |
+| --- | --- |
+| `Execute()` | `ExecuteAsync(ct)` |
+| `ExecuteScalar()` | `ExecuteScalarAsync(ct)` |
+| `ExecuteScalar<T>(def)` | `ExecuteScalarAsync<T>(def, ct)` |
+| `ExecuteReader(behavior)` | `ExecuteReaderAsync(behavior, ct)` |
+| `GetDataReader()` | `GetDataReaderAsync(ct)` |
+| `OpenDataSet(name)` | `OpenDataSetAsync(name, ct)` |
+| `OpenTable(name)` | `OpenTableAsync(name, ct)` |
+| `GetRows()` | `GetRowsAsync(ct)` |
+| `GetRowSets()` | `GetRowSetsAsync(ct)` |
+| `GetObject<T>(...)` | `GetObjectAsync<T>(..., ct)` |
+| `GetObjects<T>(...)` | `GetObjectsAsync<T>(..., ct)` |
+
+On **.NET 8.0**, `BaseCommand` also implements `IAsyncDisposable`, so commands can be used with `await using`. `Prepare()` and the transaction methods (`BeginTransaction`/`Commit`/`Rollback`) remain synchronous — `SqlCommandBuilder.DeriveParameters` has no async API — but async execute methods work fine inside a transaction begun synchronously.
+
 ## Transactions
 
 ```csharp
@@ -122,6 +149,16 @@ using (var cmd2 = new UnitySqlCommand("..."))
         trans?.Rollback();
     }
 }
+```
+
+`BeginTransaction()` uses `IsolationLevel.ReadCommitted` by default. Pass an explicit level with the `BeginTransaction(IsolationLevel)` overload when you need something stricter.
+
+## Error context and sensitive data
+
+When a command fails, the resulting `ContextualSqlException.Context` includes the command text and the parameter **names and types**. Parameter *values* are omitted by default because they often carry PII, tokens, or credentials. To include values (e.g. in a non-production diagnostic build), opt in:
+
+```csharp
+DataLibrary.IncludeParameterValuesInErrors = true;
 ```
 
 ## Full API documentation

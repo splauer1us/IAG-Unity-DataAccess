@@ -10,6 +10,14 @@ namespace Iag.Unity.DataAccess
         public static string ConnectionString { get; set; }
         public static bool IsInitialized { get; set; }
         public static Action<Exception> LoggingCallback { get; set; }
+
+        /// <summary>
+        /// When true, the parameter <em>values</em> of a failed command are included in the
+        /// context attached to a <see cref="Exceptions.ContextualSqlException"/>. Off by default
+        /// because parameters routinely carry PII, tokens, or credentials that would otherwise be
+        /// written to logs. When false, only parameter names and types are recorded.
+        /// </summary>
+        public static bool IncludeParameterValuesInErrors { get; set; } = false;
         public static void Initialize(string connectionString, Action<Exception> loggingCallback = null)
         {
             try
@@ -70,10 +78,21 @@ namespace Iag.Unity.DataAccess
 
         public static void Initialize(string serverName, string databaseName, bool useIntegratedSecurity, string userName, string password)
         {
+            var builder = new SqlConnectionStringBuilder
+            {
+                DataSource = serverName,
+                InitialCatalog = databaseName
+            };
+
             if (useIntegratedSecurity)
-                Initialize(String.Format("Server={0}; Database={1}; Integrated Security=true;", serverName, databaseName));
+                builder.IntegratedSecurity = true;
             else
-                Initialize(String.Format("Server={0}; Database={1}; User Id={2}; Password={3};", serverName, databaseName, userName, password));
+            {
+                builder.UserID = userName;
+                builder.Password = password;
+            }
+
+            Initialize(builder.ConnectionString);
         }
 
         public static void Initialize(string serverName, string databaseName)

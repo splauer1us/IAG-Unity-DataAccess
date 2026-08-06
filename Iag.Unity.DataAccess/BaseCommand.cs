@@ -8,7 +8,11 @@ using System.Text;
 
 namespace Iag.Unity.DataAccess
 {
+#if NET8_0_OR_GREATER
+    public abstract class BaseCommand : IDisposable, IAsyncDisposable
+#else
     public abstract class BaseCommand : IDisposable
+#endif
     {
         private Dictionary<string, object> parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, SqlDbType> explicitParameterTypes = new Dictionary<string, SqlDbType>(StringComparer.OrdinalIgnoreCase);
@@ -107,9 +111,10 @@ namespace Iag.Unity.DataAccess
             this.procedureName = procedureName;
             if (connection == null)
             {
-
-                connection = DataLibrary.GetConnection();
-
+                // Create the connection but do NOT open it here. Opening in the constructor
+                // reserves a pooled connection for the whole lifetime of this object even if
+                // no command is ever executed. OpenConnection() opens it on first use instead.
+                connection = DataLibrary.GetConnection(doNotOpen: true);
             }
             else
                 externalConnection = true;
@@ -252,6 +257,32 @@ namespace Iag.Unity.DataAccess
             }
         }
 
+        public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var start = Stopwatch.StartNew();
+                EnsureCommand();
+
+                await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                TransferParameters();
+
+                await this.sqlCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                TransferParametersPost();
+                ExecuteTime = start.Elapsed;
+            }
+            catch (SqlException ex)
+            {
+                InvalidateParameterCache();
+                throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
+            }
+        }
+
         private ContextualSqlException BuildContextException(SqlException ex)
         {
             string context;
@@ -266,11 +297,15 @@ namespace Iag.Unity.DataAccess
 
                 builder.AppendLine("Parameters:");
 
+                bool includeValues = DataLibrary.IncludeParameterValuesInErrors;
                 Func<object, string> isNull = (value) => (value == null || value == DBNull.Value ? "(null)" : Convert.ToString(value));
 
                 this.sqlCommand.Parameters.Cast<SqlParameter>().ToList().ForEach(parameter =>
                 {
-                    builder.Append(parameter.ParameterName).Append(" = ").Append(isNull(parameter.Value)).AppendLine();
+                    builder.Append(parameter.ParameterName).Append(" (").Append(parameter.SqlDbType).Append(')');
+                    if (includeValues)
+                        builder.Append(" = ").Append(isNull(parameter.Value));
+                    builder.AppendLine();
                 });
 
                 context = builder.ToString();
@@ -331,8 +366,13 @@ namespace Iag.Unity.DataAccess
 
         public SqlTransaction BeginTransaction()
         {
+            return BeginTransaction(IsolationLevel.ReadCommitted);
+        }
+
+        public SqlTransaction BeginTransaction(IsolationLevel isolationLevel)
+        {
             OpenConnection();
-            Prepare(sqlConnection.BeginTransaction(IsolationLevel.Serializable));
+            Prepare(sqlConnection.BeginTransaction(isolationLevel));
             return sqlCommand.Transaction;
         }
 
@@ -366,6 +406,15 @@ namespace Iag.Unity.DataAccess
                 sqlConnection.Open();
         }
 
+        private async Task OpenConnectionAsync(CancellationToken cancellationToken)
+        {
+            if (sqlConnection == null)
+                throw new InvalidOperationException("The sql connection is null.");
+
+            if (sqlConnection.State != System.Data.ConnectionState.Open)
+                await sqlConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         public DataSet OpenDataSet(string name = null)
         {
             try
@@ -376,9 +425,9 @@ namespace Iag.Unity.DataAccess
                 TransferParameters();
 
                 OpenConnection();
-                SqlDataAdapter da = new SqlDataAdapter(this.sqlCommand);
                 DataSet ds = String.IsNullOrWhiteSpace(name) ? new DataSet() : new DataSet(name);
-                da.Fill(ds);
+                using (SqlDataAdapter da = new SqlDataAdapter(this.sqlCommand))
+                    da.Fill(ds);
                 TransferParametersPost();
                 ExecuteTime = start.Elapsed;
 
@@ -394,6 +443,80 @@ namespace Iag.Unity.DataAccess
                 InvalidateParameterCache();
                 throw;
             }
+        }
+
+        public async Task<DataSet> OpenDataSetAsync(string name = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                EnsureCommand();
+
+                var start = Stopwatch.StartNew();
+                TransferParameters();
+
+                await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                DataSet ds = String.IsNullOrWhiteSpace(name) ? new DataSet() : new DataSet(name);
+
+                // SqlDataAdapter.Fill has no async counterpart, so populate the DataSet from an
+                // async reader instead. Output/return parameters are only available once the reader
+                // is closed, so TransferParametersPost() runs after the using block.
+                using (SqlDataReader reader = (SqlDataReader)await this.sqlCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                    await FillDataSetAsync(ds, reader, cancellationToken).ConfigureAwait(false);
+
+                TransferParametersPost();
+                ExecuteTime = start.Elapsed;
+
+                return ds;
+            }
+            catch (SqlException ex)
+            {
+                InvalidateParameterCache();
+                throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
+            }
+        }
+
+        private static async Task FillDataSetAsync(DataSet ds, SqlDataReader reader, CancellationToken cancellationToken)
+        {
+            do
+            {
+                // Result sets carrying no columns (e.g. row counts from DML) are skipped, as Fill does.
+                if (reader.FieldCount == 0)
+                    continue;
+
+                var table = new DataTable();
+                for (int i = 0; i < reader.FieldCount; i++)
+                    table.Columns.Add(BuildColumn(table, reader.GetName(i), reader.GetFieldType(i)));
+
+                object[] values = new object[reader.FieldCount];
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    reader.GetValues(values);
+                    table.Rows.Add(values);
+                }
+
+                ds.Tables.Add(table);
+            }
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false));
+        }
+
+        // Mirrors SqlDataAdapter.Fill's handling of unnamed and duplicate columns: unnamed columns
+        // become "Column", and any collision gets a numeric suffix ("Column1", "Foo1", ...).
+        private static DataColumn BuildColumn(DataTable table, string columnName, Type columnType)
+        {
+            if (String.IsNullOrEmpty(columnName))
+                columnName = "Column";
+
+            string unique = columnName;
+            int suffix = 0;
+            while (table.Columns.Contains(unique))
+                unique = columnName + (++suffix);
+
+            return new DataColumn(unique, columnType);
         }
 
         private void TransferParametersPost()
@@ -441,6 +564,33 @@ namespace Iag.Unity.DataAccess
                 return new DataTable();
         }
 
+        public async Task<IEnumerable<DataRow>> GetRowsAsync(CancellationToken cancellationToken = default)
+        {
+            DataTable table = await OpenTableAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return table.Rows.Cast<DataRow>();
+        }
+
+        public async Task<IEnumerable<IEnumerable<DataRow>>> GetRowSetsAsync(CancellationToken cancellationToken = default)
+        {
+            DataSet ds = await OpenDataSetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return ds.Tables.Cast<DataTable>().Select(table => table.Rows.Cast<DataRow>());
+        }
+
+        public async Task<DataTable> OpenTableAsync(string name = null, CancellationToken cancellationToken = default)
+        {
+            DataSet ds = await OpenDataSetAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (ds.Tables.Count > 0)
+            {
+                if (!String.IsNullOrWhiteSpace(name))
+                    ds.Tables[0].TableName = name;
+                DataTable tble = ds.Tables[0];
+                ds.Tables.Remove(tble);
+                return tble;
+            }
+            else
+                return new DataTable();
+        }
+
         public SqlDataReader GetDataReader()
         {
             try
@@ -461,6 +611,11 @@ namespace Iag.Unity.DataAccess
                 InvalidateParameterCache();
                 throw;
             }
+        }
+
+        public Task<SqlDataReader> GetDataReaderAsync(CancellationToken cancellationToken = default)
+        {
+            return ExecuteReaderAsync(CommandBehavior.CloseConnection, cancellationToken);
         }
 
         public object ExecuteScalar()
@@ -493,9 +648,48 @@ namespace Iag.Unity.DataAccess
 
         public T ExecuteScalar<T>(T defaultValue)
         {
-            var start = Stopwatch.StartNew();
+            // ExecuteScalar() already records ExecuteTime for the round-trip; don't overwrite it
+            // here (that would fold the Convert.ChangeType overhead into the reported timing).
             object val = ExecuteScalar();
-            ExecuteTime = start.Elapsed;
+
+            if (val == null || val == DBNull.Value)
+                return defaultValue;
+            else
+                return (T)Convert.ChangeType(val, typeof(T));
+        }
+
+        public async Task<object> ExecuteScalarAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                EnsureCommand();
+                TransferParameters();
+
+                await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+                var start = Stopwatch.StartNew();
+                object ret = await this.sqlCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                TransferParametersPost();
+                ExecuteTime = start.Elapsed;
+
+                return ret;
+            }
+            catch (SqlException ex)
+            {
+                InvalidateParameterCache();
+                throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
+            }
+        }
+
+        public async Task<T> ExecuteScalarAsync<T>(T defaultValue, CancellationToken cancellationToken = default)
+        {
+            // ExecuteScalarAsync() already records ExecuteTime for the round-trip.
+            object val = await ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
 
             if (val == null || val == DBNull.Value)
                 return defaultValue;
@@ -512,6 +706,28 @@ namespace Iag.Unity.DataAccess
 
                 OpenConnection();
                 return this.sqlCommand.ExecuteReader(commandBehavior);
+            }
+            catch (SqlException ex)
+            {
+                InvalidateParameterCache();
+                throw BuildContextException(ex);
+            }
+            catch
+            {
+                InvalidateParameterCache();
+                throw;
+            }
+        }
+
+        public async Task<SqlDataReader> ExecuteReaderAsync(CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                EnsureCommand();
+                TransferParameters();
+
+                await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                return (SqlDataReader)await this.sqlCommand.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(false);
             }
             catch (SqlException ex)
             {
@@ -580,7 +796,25 @@ namespace Iag.Unity.DataAccess
         public IEnumerable<T> GetObjects<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false) where T : class, new()
         {
             DataTable table = OpenTable();
+            return MapTable<T>(table, mapFunction, translationAction, strict);
+        }
 
+        public async Task<T> GetObjectAsync<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false, CancellationToken cancellationToken = default) where T : class, new()
+        {
+            var results = await GetObjectsAsync<T>(mapFunction, translationAction, strict, cancellationToken).ConfigureAwait(false);
+            return results.FirstOrDefault();
+        }
+
+        public async Task<IEnumerable<T>> GetObjectsAsync<T>(Func<string, string> mapFunction = null, Action<TranslationHandler> translationAction = null, bool strict = false, CancellationToken cancellationToken = default) where T : class, new()
+        {
+            DataTable table = await OpenTableAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            return MapTable<T>(table, mapFunction, translationAction, strict);
+        }
+
+        // Column->object mapping shared by the sync and async GetObjects paths. Pure CPU work
+        // (reflection + conversion) once the DataTable is in hand, so there is nothing to await here.
+        private IEnumerable<T> MapTable<T>(DataTable table, Func<string, string> mapFunction, Action<TranslationHandler> translationAction, bool strict) where T : class, new()
+        {
             // Build the column->property plan once, not once per row.
             List<PropertyMapping> plan = BuildMappingPlan<T>(table, mapFunction, strict);
 
@@ -710,6 +944,23 @@ namespace Iag.Unity.DataAccess
 
             this.isDisposed = true;
         }
+
+#if NET8_0_OR_GREATER
+        public async ValueTask DisposeAsync()
+        {
+            if (this.isDisposed)
+                return;
+
+            if (this.sqlCommand != null)
+                await this.sqlCommand.DisposeAsync().ConfigureAwait(false);
+
+            // only dispose of the connection if we created it
+            if (this.sqlConnection != null && !externalConnection)
+                await this.sqlConnection.DisposeAsync().ConfigureAwait(false);
+
+            this.isDisposed = true;
+        }
+#endif
 
         #endregion
     }
