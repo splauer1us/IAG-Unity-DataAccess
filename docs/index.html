@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Documentation for Iag.Unity.DataAccess — a lightweight .NET data-access library for Microsoft SQL Server.">
+<title>Iag.Unity.DataAccess — Documentation</title>
+<style>
+  /* Minimal reset */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+  img, svg { max-width: 100%; display: block; }
+  button { font: inherit; }
+
+  :root {
+    --bg: #FBFCFD;
+    --surface: #FFFFFF;
+    --surface-2: #EEF2F6;
+    --code-bg: #0E1620;
+    --code-text: #DCE6F0;
+    --border: #D9E1E9;
+    --border-strong: #C3CED9;
+    --text: #14202B;
+    --text-dim: #5C6B78;
+    --text-faint: #8595A2;
+    --accent: #0B7A85;
+    --accent-strong: #075660;
+    --accent-soft: #E1F2F3;
+    --warn: #9A6400;
+    --warn-bg: #FBF2DD;
+    --warn-border: #ECD59B;
+    --danger: #A32B27;
+    --danger-bg: #FBE9E8;
+    --danger-border: #EEBFBC;
+    --good: #1F7A46;
+    --good-bg: #E4F3E9;
+    --good-border: #BADFC6;
+    --shadow: 0 1px 2px rgba(20,32,43,.06), 0 6px 20px rgba(20,32,43,.05);
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --maxprose: 74ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C1319;
+      --surface: #111B23;
+      --surface-2: #0A1219;
+      --code-bg: #060B10;
+      --code-text: #D6E2EC;
+      --border: #21313D;
+      --border-strong: #2C3F4D;
+      --text: #E7EEF4;
+      --text-dim: #93A4B2;
+      --text-faint: #6D808F;
+      --accent: #3FC7D2;
+      --accent-strong: #79E2EB;
+      --accent-soft: #10353A;
+      --warn: #E7B85C;
+      --warn-bg: #241D0E;
+      --warn-border: #4A3C1A;
+      --danger: #F0908B;
+      --danger-bg: #2A1413;
+      --danger-border: #532320;
+      --good: #71D298;
+      --good-bg: #0F241A;
+      --good-border: #1F4632;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FBFCFD; --surface: #FFFFFF; --surface-2: #EEF2F6; --code-bg: #0E1620; --code-text: #DCE6F0;
+    --border: #D9E1E9; --border-strong: #C3CED9; --text: #14202B; --text-dim: #5C6B78; --text-faint: #8595A2;
+    --accent: #0B7A85; --accent-strong: #075660; --accent-soft: #E1F2F3;
+    --warn: #9A6400; --warn-bg: #FBF2DD; --warn-border: #ECD59B;
+    --danger: #A32B27; --danger-bg: #FBE9E8; --danger-border: #EEBFBC;
+    --good: #1F7A46; --good-bg: #E4F3E9; --good-border: #BADFC6;
+    --shadow: 0 1px 2px rgba(20,32,43,.06), 0 6px 20px rgba(20,32,43,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0C1319; --surface: #111B23; --surface-2: #0A1219; --code-bg: #060B10; --code-text: #D6E2EC;
+    --border: #21313D; --border-strong: #2C3F4D; --text: #E7EEF4; --text-dim: #93A4B2; --text-faint: #6D808F;
+    --accent: #3FC7D2; --accent-strong: #79E2EB; --accent-soft: #10353A;
+    --warn: #E7B85C; --warn-bg: #241D0E; --warn-border: #4A3C1A;
+    --danger: #F0908B; --danger-bg: #2A1413; --danger-border: #532320;
+    --good: #71D298; --good-bg: #0F241A; --good-border: #1F4632;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.35);
+  }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 288px minmax(0, 1fr); gap: 0; }
+  .sidebar {
+    position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+    background: var(--surface-2); border-right: 1px solid var(--border);
+    padding: 26px 20px 40px;
+  }
+  .main { min-width: 0; padding: 0 clamp(20px, 5vw, 76px) 120px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  /* Sidebar brand */
+  .brand { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+  .brand-title { font-family: var(--font-mono); font-size: 14.5px; font-weight: 700; letter-spacing: -.2px; color: var(--text); }
+  .brand-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .3px;
+    padding: 2.5px 8px; border-radius: 999px; border: 1px solid var(--border-strong);
+    color: var(--text-dim); background: var(--surface); white-space: nowrap;
+  }
+  .pill.accent { color: var(--accent-strong); border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong)); background: var(--accent-soft); }
+
+  nav.toc { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+  .toc-group { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-faint); margin: 18px 0 6px; padding-left: 10px; }
+  .toc a {
+    display: block; padding: 5px 10px; border-radius: 7px; color: var(--text-dim);
+    font-size: 13.5px; border-left: 2px solid transparent; transition: background .15s, color .15s;
+  }
+  .toc a:hover { background: var(--surface); color: var(--text); text-decoration: none; }
+  .toc a.active { color: var(--accent-strong); background: var(--surface); border-left-color: var(--accent); font-weight: 600; }
+
+  /* Topbar (mobile) */
+  .topbar {
+    display: none; position: sticky; top: 0; z-index: 40;
+    align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 18px; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+  }
+  .topbar .brand-title { font-size: 13px; }
+  .iconbtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 34px; padding: 0 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-dim);
+    font-family: var(--font-mono); font-size: 12px;
+  }
+  .iconbtn:hover { color: var(--text); border-color: var(--accent); }
+  .theme-fixed { position: fixed; top: 16px; right: 18px; z-index: 50; }
+  @media (max-width: 920px) { .theme-fixed { display: none; } }
+
+  /* Hero */
+  .hero { padding: 54px 0 30px; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+  h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.08; letter-spacing: -1px; margin: 0 0 16px; text-wrap: balance; font-weight: 800; }
+  .lede { font-size: clamp(17px, 2.2vw, 19px); color: var(--text-dim); max-width: var(--maxprose); margin: 0 0 26px; }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+
+  /* Sections */
+  section { padding-top: 26px; margin-bottom: 26px; scroll-margin-top: 24px; }
+  section > .wrap { max-width: 900px; }
+  h2 { font-size: clamp(23px, 3vw, 29px); letter-spacing: -.5px; margin: 30px 0 6px; font-weight: 750; text-wrap: balance; }
+  h2 .h2-eyebrow { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  h3 { font-size: 18.5px; letter-spacing: -.2px; margin: 34px 0 8px; font-weight: 700; }
+  h4 { font-size: 15px; margin: 24px 0 6px; font-weight: 700; font-family: var(--font-mono); color: var(--text); }
+  p { max-width: var(--maxprose); margin: 12px 0; }
+  .prose ul, .prose ol { max-width: var(--maxprose); padding-left: 22px; }
+  .prose li { margin: 6px 0; }
+  .divider { height: 1px; background: var(--border); border: 0; margin: 46px 0 0; }
+  code.inline {
+    font-family: var(--font-mono); font-size: .87em; padding: 1.5px 6px; border-radius: 5px;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--accent-strong);
+    word-break: break-word;
+  }
+
+  /* Code blocks */
+  .code { margin: 18px 0; border-radius: 11px; overflow: hidden; border: 1px solid var(--border-strong); box-shadow: var(--shadow); background: var(--code-bg); }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px 8px 14px; background: color-mix(in srgb, var(--code-bg) 82%, #ffffff 5%);
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .code-lang { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: #7C93A6; }
+  .copybtn {
+    font-family: var(--font-mono); font-size: 11px; color: #9DB2C2; background: transparent;
+    border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 3px 9px; cursor: pointer; transition: all .15s;
+  }
+  .copybtn:hover { color: #fff; border-color: var(--accent); }
+  .copybtn.done { color: var(--accent-strong); border-color: var(--accent); }
+  .code pre { margin: 0; padding: 15px 16px; overflow-x: auto; }
+  .code code { font-family: var(--font-mono); font-size: 13px; line-height: 1.7; color: var(--code-text); white-space: pre; }
+  .tok-com { color: #6B8296; font-style: italic; }
+  .tok-str { color: #8FD69A; }
+  .tok-kw  { color: #62B6E8; }
+  .tok-type{ color: #E0C378; }
+  .tok-num { color: #E59B7D; }
+
+  /* Callouts */
+  .callout { display: grid; grid-template-columns: auto 1fr; gap: 12px; margin: 20px 0; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+  .callout p { margin: 0; max-width: none; }
+  .callout p + p { margin-top: 8px; }
+  .callout .tag { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding-top: 3px; white-space: nowrap; }
+  .callout.note { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 34%, var(--border)); }
+  .callout.note .tag { color: var(--accent-strong); }
+  .callout.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.breaking { background: var(--danger-bg); border-color: var(--danger-border); }
+  .callout.breaking .tag { color: var(--danger); }
+  .callout.tip { background: var(--good-bg); border-color: var(--good-border); }
+  .callout.tip .tag { color: var(--good); }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--border); border-radius: 11px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--surface); }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { background: var(--surface-2); font-family: var(--font-mono); font-size: 11px; letter-spacing: .6px; text-transform: uppercase; color: var(--text-dim); font-weight: 600; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code, th code { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent-strong); white-space: nowrap; }
+  td.desc { color: var(--text-dim); }
+  td.desc code { color: var(--accent-strong); white-space: normal; }
+
+  /* Feature grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 22px 0; }
+  .card { padding: 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .card h4 { margin: 0 0 6px; font-family: var(--font-sans); font-size: 15px; }
+  .card p { margin: 0; font-size: 14px; color: var(--text-dim); max-width: none; }
+  .card .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 10px; }
+
+  footer { border-top: 1px solid var(--border); margin-top: 60px; padding-top: 26px; color: var(--text-faint); font-size: 13.5px; }
+  footer .wrap { max-width: 900px; }
+
+  @media (max-width: 920px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; position: fixed; z-index: 45; width: min(320px, 84vw); height: 100vh; box-shadow: var(--shadow); }
+    .sidebar.open { display: block; }
+    .topbar { display: flex; }
+    .scrim { display: none; position: fixed; inset: 0; z-index: 44; background: rgba(0,0,0,.4); }
+    .scrim.open { display: block; }
+    .hero { padding-top: 30px; }
+  }
+</style>
+</head>
+<body>
+
+<button class="iconbtn theme-fixed" id="themeToggle" aria-label="Toggle color theme">◐ Theme</button>
+
+<div class="topbar">
+  <button class="iconbtn" id="menuBtn" aria-label="Open navigation">☰ Menu</button>
+  <span class="brand-title">Iag.Unity.DataAccess</span>
+  <button class="iconbtn" id="themeToggleM" aria-label="Toggle color theme">◐</button>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-title">Iag.Unity.DataAccess</span>
+      <div class="brand-badges">
+        <span class="pill accent">v2.2.0</span>
+        <span class="pill">MIT</span>
+        <span class="pill">SqlClient 7.0.2</span>
+      </div>
+    </div>
+    <nav class="toc" id="toc">
+      <span class="toc-group">Start</span>
+      <a href="#overview">Overview</a>
+      <a href="#install">Installation</a>
+      <a href="#getting-started">Getting started</a>
+      <span class="toc-group">Core</span>
+      <a href="#core-types">Command types</a>
+      <a href="#parameters">Parameters</a>
+      <span class="toc-group">Execution</span>
+      <a href="#executing">Executing commands</a>
+      <a href="#async">Async</a>
+      <a href="#mapping">Object mapping</a>
+      <a href="#transactions">Transactions</a>
+      <span class="toc-group">Operational</span>
+      <a href="#errors">Error handling</a>
+      <a href="#performance">Performance</a>
+      <a href="#security">Security</a>
+      <span class="toc-group">Reference</span>
+      <a href="#api-reference">API reference</a>
+      <a href="#changelog">What's new in 2.2.0</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="wrap">
+      <header class="hero" id="top">
+        <p class="eyebrow">.NET Data Access Library · Documentation</p>
+        <h1>A thin, honest wrapper over SqlConnection &amp; SqlCommand</h1>
+        <p class="lede">Iag.Unity.DataAccess turns stored procedures and ad-hoc SQL into a few small objects — parameters, object mapping, transactions, and now full async — without hiding what ADO.NET is actually doing underneath.</p>
+        <div class="hero-meta">
+          <span class="pill">net462</span>
+          <span class="pill">netstandard2.0</span>
+          <span class="pill">net8.0</span>
+          <span class="pill accent">async + IAsyncDisposable</span>
+        </div>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp = new StoredProcedure("dbo.GetCustomers"))
+{
+    var customers = (await sp.GetObjectsAsync&lt;Customer&gt;()).ToList();
+}</code></pre></div>
+      </header>
+
+      <section id="overview" class="prose">
+        <h2><span class="h2-eyebrow">Start</span>Overview</h2>
+        <p>The library exposes two command objects — <code class="inline">StoredProcedure</code> and <code class="inline">UnitySqlCommand</code> — that share a common base, <code class="inline">BaseCommand</code>. You supply parameters through a simple dictionary, call an execution method, and get back a <code class="inline">DataTable</code>, <code class="inline">DataSet</code>, reader, scalar, or a list of mapped objects. A static <code class="inline">DataLibrary</code> holds the default connection string so you rarely pass connections around.</p>
+        <div class="grid">
+          <div class="card"><span class="k">Simple params</span><h4>Dictionary in, results out</h4><p>Set <code class="inline">Parameters["@Id"] = 123</code>. No <code class="inline">SqlParameter</code> ceremony for the common case.</p></div>
+          <div class="card"><span class="k">Optional Prepare</span><h4>Metadata only when you need it</h4><p>Skip the server round-trip for input-only procs; call <code class="inline">Prepare()</code> when you want derived types and output values.</p></div>
+          <div class="card"><span class="k">Object mapping</span><h4>Rows to typed objects</h4><p><code class="inline">GetObjects&lt;T&gt;()</code> maps by name, by attribute, or by a custom function.</p></div>
+          <div class="card"><span class="k">Full async</span><h4>Genuine non-blocking I/O</h4><p>Every execute method has an <code class="inline">...Async</code> twin with <code class="inline">CancellationToken</code> support.</p></div>
+        </div>
+      </section>
+
+      <section id="install" class="prose">
+        <h2><span class="h2-eyebrow">Start</span>Installation</h2>
+        <p>Install from NuGet. The single package multi-targets .NET Framework 4.6.2, .NET Standard 2.0, and .NET 8.0, and is built on <code class="inline">Microsoft.Data.SqlClient</code> 7.0.2.</p>
+        <div class="code" data-lang="bash"><pre><code class="language-bash">dotnet add package Iag.Unity.DataAccess.dll</code></pre></div>
+        <div class="callout note"><span class="tag">Note</span><div><p>The package id carries a <code class="inline">.dll</code> suffix (<code class="inline">Iag.Unity.DataAccess.dll</code>) — that is the id on NuGet, not a filename. The assembly and namespace are plain <code class="inline">Iag.Unity.DataAccess</code>.</p></div></div>
+      </section>
+
+      <section id="getting-started" class="prose">
+        <h2><span class="h2-eyebrow">Start</span>Getting started</h2>
+        <p>Initialize the library once at startup with a connection string. Every command created afterward uses it automatically.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using Iag.Unity.DataAccess;
+
+DataLibrary.Initialize("Server=.;Database=MyDb;Integrated Security=true;");</code></pre></div>
+        <p><code class="inline">Initialize</code> also tests the connection and sets <code class="inline">IsInitialized</code>. Overloads build the connection string for you from parts — these now use <code class="inline">SqlConnectionStringBuilder</code> internally, so values containing <code class="inline">;</code> or <code class="inline">"</code> are escaped safely rather than injected.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">// Integrated security
+DataLibrary.Initialize("sql01", "MyDb");
+
+// SQL login
+DataLibrary.Initialize("sql01", "MyDb", "app_user", "s3cr3t;value");
+
+// With a logging callback for internal diagnostics
+DataLibrary.Initialize(connectionString, ex =&gt; _logger.LogError(ex, "DataAccess"));</code></pre></div>
+        <h3>Managing connections yourself</h3>
+        <p>If you manage connections directly — multiple databases, an ambient connection — pass a <code class="inline">SqlConnection</code> to the constructor. The library opens it on first use if it is not already open, and (importantly) will <em>not</em> dispose a connection it did not create.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var conn = new SqlConnection(connectionString))
+using (var sp = new StoredProcedure(conn, "dbo.GetCustomer"))
+{
+    sp.Parameters["@Id"] = 123;
+    DataTable tbl = sp.OpenTable();
+} // conn is disposed by its own using, not by sp</code></pre></div>
+        <div class="callout tip"><span class="tag">Since 2.2</span><div><p>An internally-created connection is no longer opened in the constructor — it opens lazily on the first execute/prepare call. Constructing a command no longer reserves a pooled connection you might never use.</p></div></div>
+      </section>
+
+      <section id="core-types" class="prose">
+        <h2><span class="h2-eyebrow">Core</span>Command types</h2>
+        <p>Both command types derive from <code class="inline">BaseCommand</code> and share the entire execution and mapping surface. The only difference is how the command text is interpreted.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Type</th><th>CommandType</th><th>Constructor argument</th></tr></thead>
+          <tbody>
+            <tr><td><code>StoredProcedure</code></td><td><code>StoredProcedure</code></td><td class="desc">A stored procedure name, e.g. <code>"dbo.GetCustomer"</code>.</td></tr>
+            <tr><td><code>UnitySqlCommand</code></td><td><code>Text</code></td><td class="desc">A raw SQL statement with <code>@named</code> parameters.</td></tr>
+          </tbody>
+        </table></div>
+        <p>Each has three constructors: parameterless (uses the default connection), name/text only, and <code class="inline">(SqlConnection, name)</code>. <code class="inline">StoredProcedure</code> additionally offers a helper to fetch a procedure's source text:</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">string body = StoredProcedure.GetProcedureText("dbo.GetCustomer");</code></pre></div>
+      </section>
+
+      <section id="parameters" class="prose">
+        <h2><span class="h2-eyebrow">Core</span>Parameters</h2>
+        <p>The common path is the <code class="inline">Parameters</code> dictionary — case-insensitive, keyed by parameter name. Values are sent as-is; nulls become <code class="inline">DBNull</code>.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp = new StoredProcedure("dbo.CreateCustomer"))
+{
+    sp.Parameters["@Name"] = "Ada";
+    sp.Parameters["@Region"] = null;      // sent as DBNull
+    sp.Execute();
+}</code></pre></div>
+
+        <h3>Prepare(): derive metadata from the server</h3>
+        <p><code class="inline">Prepare()</code> asks the server for the procedure's parameter metadata — exact types, sizes, and <strong>OUTPUT/RETURN</strong> directions. It is opt-in. Skip it for input-only procedures; call it when you need precise typing or want to read output/return values back.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp = new StoredProcedure("dbo.CreateOrder"))
+{
+    sp.Prepare();                          // one metadata round-trip (cached)
+    sp.Parameters["@CustomerId"] = 123;
+    sp.Execute();
+    int newId = (int)sp.Parameters["@NewOrderId"];   // output captured
+}</code></pre></div>
+        <div class="callout note"><span class="tag">Cache</span><div><p>Derived metadata is cached per <em>data source + database + procedure</em>, so repeated <code class="inline">Prepare()</code> calls avoid further round-trips. Each command gets its own parameter clones — the cache is never mutated. A cache entry is evicted automatically when a command using it fails, so a changed procedure signature self-heals on the next call.</p></div></div>
+
+        <h3>Output &amp; return values without Prepare()</h3>
+        <p>To capture outputs on the fast path, declare them explicitly. Read outputs back from <code class="inline">Parameters[name]</code> and the procedure's return code from <code class="inline">ReturnValue</code>.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp = new StoredProcedure("dbo.CreateOrder"))
+{
+    sp.Parameters["@CustomerId"] = 123;                   // input
+    sp.AddOutputParameter("@NewOrderId", SqlDbType.Int);  // output
+    sp.AddReturnParameter();                              // return value
+
+    sp.Execute();
+
+    int newId = (int)sp.Parameters["@NewOrderId"];        // output  -&gt; Parameters
+    int code  = sp.ReturnValue ?? 0;                      // return  -&gt; ReturnValue
+}</code></pre></div>
+        <p>Seeding a value for a declared output parameter promotes it to <code class="inline">InputOutput</code> automatically. <code class="inline">DeclareParameter(name, type, direction, size)</code> is the general form; it returns the underlying <code class="inline">SqlParameter</code> so you can set precision, scale, and so on. <code class="inline">SetParameterType(name, SqlDbType)</code> overrides the inferred type of an existing parameter.</p>
+      </section>
+
+      <section id="executing" class="prose">
+        <h2><span class="h2-eyebrow">Execution</span>Executing commands</h2>
+        <p>Pick the execution method by the shape of the result you want. All of them open the connection if needed, apply parameters, and read output/return values back afterward.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Method</th><th>Returns</th><th>Use for</th></tr></thead>
+          <tbody>
+            <tr><td><code>Execute()</code></td><td><code>void</code></td><td class="desc">Commands with no result set (INSERT/UPDATE/DELETE, or output-only procs).</td></tr>
+            <tr><td><code>OpenTable(name?)</code></td><td><code>DataTable</code></td><td class="desc">A single result set.</td></tr>
+            <tr><td><code>OpenDataSet(name?)</code></td><td><code>DataSet</code></td><td class="desc">Multiple result sets.</td></tr>
+            <tr><td><code>GetRows()</code></td><td><code>IEnumerable&lt;DataRow&gt;</code></td><td class="desc">Rows of the first result set.</td></tr>
+            <tr><td><code>GetRowSets()</code></td><td><code>IEnumerable&lt;IEnumerable&lt;DataRow&gt;&gt;</code></td><td class="desc">Rows grouped by result set.</td></tr>
+            <tr><td><code>ExecuteScalar()</code></td><td><code>object</code></td><td class="desc">A single value.</td></tr>
+            <tr><td><code>ExecuteScalar&lt;T&gt;(def)</code></td><td><code>T</code></td><td class="desc">A single value converted to <code>T</code>, with a default for null/DBNull.</td></tr>
+            <tr><td><code>ExecuteReader(behavior?)</code></td><td><code>SqlDataReader</code></td><td class="desc">Streaming access; you control the reader lifetime.</td></tr>
+            <tr><td><code>GetDataReader()</code></td><td><code>SqlDataReader</code></td><td class="desc">Reader with <code>CommandBehavior.CloseConnection</code>.</td></tr>
+          </tbody>
+        </table></div>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var cmd = new UnitySqlCommand("SELECT COUNT(*) FROM Customer WHERE Region = @r"))
+{
+    cmd.Parameters["@r"] = "West";
+    int count = cmd.ExecuteScalar&lt;int&gt;(0);
+}</code></pre></div>
+        <div class="callout note"><span class="tag">Timing</span><div><p>After any execute call, <code class="inline">ExecuteTime</code> (and <code class="inline">PrepareTime</code> after <code class="inline">Prepare()</code>) hold the elapsed <code class="inline">TimeSpan</code> for that round-trip — handy for lightweight profiling.</p></div></div>
+      </section>
+
+      <section id="async" class="prose">
+        <h2><span class="h2-eyebrow">Execution</span>Async</h2>
+        <p>Every command-executing method has an <code class="inline">...Async</code> counterpart that accepts an optional <code class="inline">CancellationToken</code>. These do genuine asynchronous I/O: the connection is opened with <code class="inline">OpenAsync</code>, and result sets are streamed with <code class="inline">ExecuteReaderAsync</code>/<code class="inline">ReadAsync</code> rather than a blocking <code class="inline">SqlDataAdapter.Fill</code>.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp = new StoredProcedure("dbo.GetCustomers"))
+{
+    sp.Parameters["@Region"] = "West";
+    List&lt;Customer&gt; customers = (await sp.GetObjectsAsync&lt;Customer&gt;(cancellationToken: ct)).ToList();
+}</code></pre></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Synchronous</th><th>Asynchronous</th></tr></thead>
+          <tbody>
+            <tr><td><code>Execute()</code></td><td><code>ExecuteAsync(ct)</code></td></tr>
+            <tr><td><code>ExecuteScalar()</code></td><td><code>ExecuteScalarAsync(ct)</code></td></tr>
+            <tr><td><code>ExecuteScalar&lt;T&gt;(def)</code></td><td><code>ExecuteScalarAsync&lt;T&gt;(def, ct)</code></td></tr>
+            <tr><td><code>ExecuteReader(behavior)</code></td><td><code>ExecuteReaderAsync(behavior, ct)</code></td></tr>
+            <tr><td><code>GetDataReader()</code></td><td><code>GetDataReaderAsync(ct)</code></td></tr>
+            <tr><td><code>OpenDataSet(name)</code></td><td><code>OpenDataSetAsync(name, ct)</code></td></tr>
+            <tr><td><code>OpenTable(name)</code></td><td><code>OpenTableAsync(name, ct)</code></td></tr>
+            <tr><td><code>GetRows()</code></td><td><code>GetRowsAsync(ct)</code></td></tr>
+            <tr><td><code>GetRowSets()</code></td><td><code>GetRowSetsAsync(ct)</code></td></tr>
+            <tr><td><code>GetObject&lt;T&gt;(...)</code></td><td><code>GetObjectAsync&lt;T&gt;(..., ct)</code></td></tr>
+            <tr><td><code>GetObjects&lt;T&gt;(...)</code></td><td><code>GetObjectsAsync&lt;T&gt;(..., ct)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout tip"><span class="tag">net8.0</span><div><p>On .NET 8.0, <code class="inline">BaseCommand</code> implements <code class="inline">IAsyncDisposable</code>, so you can write <code class="inline">await using var sp = new StoredProcedure(...)</code> and the connection (if owned) is disposed asynchronously.</p></div></div>
+        <div class="callout note"><span class="tag">Note</span><div><p><code class="inline">Prepare()</code> and the transaction methods stay synchronous — <code class="inline">SqlCommandBuilder.DeriveParameters</code> has no async API. Async execute methods run correctly inside a transaction that was begun synchronously.</p></div></div>
+      </section>
+
+      <section id="mapping" class="prose">
+        <h2><span class="h2-eyebrow">Mapping</span>Object mapping</h2>
+        <p><code class="inline">GetObjects&lt;T&gt;()</code> materializes a result set into a list of <code class="inline">T</code>; <code class="inline">GetObject&lt;T&gt;()</code> returns the first row (or null). The column→property plan is built once per call, not per row. Three mapping strategies are available.</p>
+
+        <h4>1 · By name</h4>
+        <p>Columns match properties by name. Matching is case-insensitive by default; pass <code class="inline">strict: true</code> for case-sensitive matching.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">var customers = sp.GetObjects&lt;Customer&gt;().ToList();
+var exact     = sp.GetObjects&lt;Customer&gt;(strict: true).ToList();</code></pre></div>
+
+        <h4>2 · By [FieldToProperty] attribute</h4>
+        <p>Decorate properties when column names differ from property names.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">public class Customer
+{
+    [FieldToProperty("cust_id")]  public int    Id   { get; set; }
+    [FieldToProperty("cust_name")] public string Name { get; set; }
+}
+
+var customers = sp.GetObjects&lt;Customer&gt;().ToList();</code></pre></div>
+
+        <h4>3 · By custom map function</h4>
+        <p>Provide a function that maps each column name to a property name (return null to skip a column).</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">Func&lt;string, string&gt; map = col =&gt; col switch
+{
+    "STR" =&gt; "StringValue",
+    "INT" =&gt; "IntValue",
+    _     =&gt; null            // ignore everything else
+};
+
+var rows = sp.GetObjects&lt;Dto&gt;(map).ToList();</code></pre></div>
+
+        <h4>Per-value translation</h4>
+        <p>Pass a <code class="inline">translationAction</code> to intercept individual values — decrypt a column, coerce a legacy sentinel, map codes to enums. Set <code class="inline">Handled = true</code> to take over assignment for that value; otherwise the default conversion runs.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">var rows = sp.GetObjects&lt;Dto&gt;(translationAction: th =&gt;
+{
+    if (th.PropertyInfo.Name == "Status")
+    {
+        th.TranslatedValue = MapStatus(th.DatabaseValue);
+        th.Handled = true;
+    }
+}).ToList();</code></pre></div>
+        <div class="callout note"><span class="tag">Types</span><div><p>Default conversion honors nullable types: a <code class="inline">DBNull</code> maps to <code class="inline">null</code> for reference and <code class="inline">Nullable&lt;T&gt;</code> properties, and non-nullable value-type properties are left at their default rather than throwing. Otherwise the value is converted to the target type with <code class="inline">Convert.ChangeType</code>.</p></div></div>
+      </section>
+
+      <section id="transactions" class="prose">
+        <h2><span class="h2-eyebrow">Execution</span>Transactions</h2>
+        <p>Begin a transaction on one command and enlist the others by preparing them with the same transaction. Commit or roll back through any enlisted command.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var cmd1 = new UnitySqlCommand("..."))
+using (var cmd2 = new UnitySqlCommand("..."))
+{
+    SqlTransaction trans = null;
+    try
+    {
+        cmd1.Prepare();
+        trans = cmd1.BeginTransaction();   // ReadCommitted by default
+        cmd2.Connection = cmd1.Connection;
+        cmd2.Prepare(trans);
+
+        cmd1.Execute();
+        cmd2.Execute();
+        trans.Commit();
+    }
+    catch
+    {
+        trans?.Rollback();
+        throw;
+    }
+}</code></pre></div>
+        <div class="callout breaking"><span class="tag">Changed in 2.2</span><div><p><code class="inline">BeginTransaction()</code> now defaults to <code class="inline">IsolationLevel.ReadCommitted</code> instead of <code class="inline">Serializable</code>. If a workflow relied on serializable semantics, request it explicitly with the new overload:</p><p><code class="inline">cmd.BeginTransaction(IsolationLevel.Serializable);</code></p></div></div>
+        <h3>CreateTransaction()</h3>
+        <p>The static helper wires a set of <code class="inline">StoredProcedure</code> objects onto one connection and one transaction, preparing each for you. Do not call <code class="inline">Prepare()</code> afterward — it is already done. Set parameters after the call.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp1 = new StoredProcedure("dbo.Debit"))
+using (var sp2 = new StoredProcedure("dbo.Credit"))
+{
+    var trans = BaseCommand.CreateTransaction(sp1, sp2);
+    try
+    {
+        sp1.Parameters["@Amount"] = 100m;  sp1.Execute();
+        sp2.Parameters["@Amount"] = 100m;  sp2.Execute();
+        trans.Commit();
+    }
+    catch { trans?.Rollback(); throw; }
+}</code></pre></div>
+        <div class="callout note"><span class="tag">Note</span><div><p><code class="inline">CreateTransaction</code> takes <code class="inline">params StoredProcedure[]</code>. To coordinate <code class="inline">UnitySqlCommand</code> objects (or a mix), use the manual <code class="inline">BeginTransaction</code>/<code class="inline">Prepare(trans)</code> pattern shown above.</p></div></div>
+      </section>
+
+      <section id="errors" class="prose">
+        <h2><span class="h2-eyebrow">Operational</span>Error handling</h2>
+        <p>When a command fails, the raised <code class="inline">SqlException</code> is wrapped in a <code class="inline">ContextualSqlException</code> whose <code class="inline">Context</code> property holds the command text and the parameters involved — enough to reproduce the failure from a log entry. The original exception is preserved as the inner exception.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">try
+{
+    sp.Execute();
+}
+catch (ContextualSqlException ex)
+{
+    _logger.LogError(ex, "Query failed:\n{Context}", ex.Context);
+}</code></pre></div>
+        <div class="callout warn"><span class="tag">Privacy</span><div><p>By default, <code class="inline">Context</code> lists parameter <strong>names and types</strong> only. Parameter <em>values</em> are omitted because they routinely carry PII, tokens, or credentials. Opt in deliberately — ideally only in non-production diagnostics:</p><p><code class="inline">DataLibrary.IncludeParameterValuesInErrors = true;</code></p></div></div>
+        <p>A failed command also invalidates its cached parameter metadata, so the next call re-derives it. Set <code class="inline">DataLibrary.LoggingCallback</code> to observe internal diagnostic exceptions (for example, a failure while building the error context itself).</p>
+      </section>
+
+      <section id="performance" class="prose">
+        <h2><span class="h2-eyebrow">Operational</span>Performance</h2>
+        <ul>
+          <li><strong>Parameter-metadata cache.</strong> <code class="inline">Prepare()</code> derives metadata once per data source + database + procedure and reuses pristine clones thereafter — no repeated <code class="inline">DeriveParameters</code> round-trips across command instances.</li>
+          <li><strong>Lazy connections (2.2).</strong> An internally-created connection opens on first use, not at construction, so short-lived or never-executed commands don't hold a pooled connection.</li>
+          <li><strong>Skip Prepare on the hot path.</strong> For input-only procedures, don't call <code class="inline">Prepare()</code>; declare any outputs explicitly instead. That removes the metadata round-trip entirely.</li>
+          <li><strong>Async reader path.</strong> Async table/object methods stream rows via <code class="inline">ReadAsync</code> rather than blocking a thread on <code class="inline">SqlDataAdapter.Fill</code>.</li>
+          <li><strong>One mapping plan per call.</strong> <code class="inline">GetObjects&lt;T&gt;()</code> resolves columns to properties once, then reuses the plan for every row.</li>
+        </ul>
+      </section>
+
+      <section id="security" class="prose">
+        <h2><span class="h2-eyebrow">Operational</span>Security</h2>
+        <ul>
+          <li><strong>Always parameterize.</strong> Use <code class="inline">Parameters["@x"]</code> and never concatenate user input into a <code class="inline">UnitySqlCommand</code> statement. Parameters are sent as real <code class="inline">SqlParameter</code>s.</li>
+          <li><strong>Connection-string safety (2.2).</strong> The part-based <code class="inline">Initialize</code> overloads build the string with <code class="inline">SqlConnectionStringBuilder</code>, so special characters in a password or server name can't inject additional keywords.</li>
+          <li><strong>Sensitive data in errors.</strong> Parameter values stay out of exception context unless you explicitly enable <code class="inline">IncludeParameterValuesInErrors</code>. Keep it off in production.</li>
+        </ul>
+      </section>
+
+      <section id="api-reference" class="prose">
+        <h2><span class="h2-eyebrow">Reference</span>API reference</h2>
+
+        <h3>DataLibrary (static)</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Member</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>Initialize(connectionString, loggingCallback?)</code></td><td class="desc">Set the default connection string and test the connection.</td></tr>
+            <tr><td><code>Initialize(server, db)</code></td><td class="desc">Integrated-security connection, built via <code>SqlConnectionStringBuilder</code>.</td></tr>
+            <tr><td><code>Initialize(server, db, user, password)</code></td><td class="desc">SQL-login connection, built safely from parts.</td></tr>
+            <tr><td><code>ConnectionString</code></td><td class="desc">The active default connection string.</td></tr>
+            <tr><td><code>IsInitialized</code></td><td class="desc">True once a connection has been established successfully.</td></tr>
+            <tr><td><code>LoggingCallback</code></td><td class="desc"><code>Action&lt;Exception&gt;</code> invoked for internal diagnostics.</td></tr>
+            <tr><td><code>IncludeParameterValuesInErrors</code></td><td class="desc">Opt-in switch to include parameter values in error context. Default <code>false</code>.</td></tr>
+            <tr><td><code>GetConnection(doNotOpen?)</code></td><td class="desc">Create a <code>SqlConnection</code> from the default string.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>BaseCommand — properties</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>Parameters</code></td><td><code>Dictionary&lt;string,object&gt;</code></td><td class="desc">Input values and, after execution, output values (case-insensitive).</td></tr>
+            <tr><td><code>ReturnValue</code></td><td><code>int?</code></td><td class="desc">The procedure's RETURN code, when a return parameter is present.</td></tr>
+            <tr><td><code>Connection</code></td><td><code>SqlConnection</code></td><td class="desc">The underlying connection; setting it resets prepared state.</td></tr>
+            <tr><td><code>Command</code></td><td><code>SqlCommand</code></td><td class="desc">The underlying command object.</td></tr>
+            <tr><td><code>CommandText</code></td><td><code>string</code></td><td class="desc">The command's text (prepares on set if needed).</td></tr>
+            <tr><td><code>Timeout</code></td><td><code>int</code></td><td class="desc">Command timeout in seconds (default 300).</td></tr>
+            <tr><td><code>IsPrepared</code></td><td><code>bool</code></td><td class="desc">Whether metadata has been derived.</td></tr>
+            <tr><td><code>ExecuteTime</code> / <code>PrepareTime</code></td><td><code>TimeSpan</code></td><td class="desc">Elapsed time of the last execute / prepare.</td></tr>
+            <tr><td><code>DerivedParameters</code></td><td><code>List&lt;SqlParameter&gt;</code></td><td class="desc">Server-derived parameter templates after <code>Prepare()</code>.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>BaseCommand — parameter &amp; transaction methods</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Method</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>Prepare()</code> / <code>Prepare(trans)</code></td><td class="desc">Derive parameter metadata; optionally enlist in a transaction.</td></tr>
+            <tr><td><code>DeclareParameter(name, type, direction, size?)</code></td><td class="desc">Declare a typed parameter; returns the <code>SqlParameter</code>.</td></tr>
+            <tr><td><code>AddOutputParameter(name, type, size?)</code></td><td class="desc">Declare an OUTPUT parameter, read back from <code>Parameters</code>.</td></tr>
+            <tr><td><code>AddReturnParameter(name?)</code></td><td class="desc">Declare the RETURN value parameter, read back from <code>ReturnValue</code>.</td></tr>
+            <tr><td><code>SetParameterType(name, SqlDbType)</code></td><td class="desc">Override the inferred type of a parameter.</td></tr>
+            <tr><td><code>BeginTransaction()</code> / <code>BeginTransaction(level)</code></td><td class="desc">Begin a transaction (default <code>ReadCommitted</code>).</td></tr>
+            <tr><td><code>Commit()</code> / <code>Rollback()</code></td><td class="desc">Complete or abort the current transaction.</td></tr>
+            <tr><td><code>static CreateTransaction(params StoredProcedure[])</code></td><td class="desc">Enlist procedures on one connection + transaction and prepare them.</td></tr>
+            <tr><td><code>Dispose()</code> / <code>DisposeAsync()</code></td><td class="desc">Dispose the command and any owned connection. <code>DisposeAsync</code> is net8.0-only.</td></tr>
+          </tbody>
+        </table></div>
+        <p>Execution methods and their async twins are listed under <a href="#executing">Executing commands</a> and <a href="#async">Async</a>.</p>
+      </section>
+
+      <section id="changelog" class="prose">
+        <h2><span class="h2-eyebrow">Reference</span>What's new in 2.2.0</h2>
+        <h3>Added</h3>
+        <ul>
+          <li>Async counterparts for all execution methods, each with <code class="inline">CancellationToken</code> support and genuine async I/O.</li>
+          <li><code class="inline">IAsyncDisposable</code> on <code class="inline">BaseCommand</code> (net8.0).</li>
+          <li><code class="inline">BeginTransaction(IsolationLevel)</code> overload.</li>
+          <li><code class="inline">DataLibrary.IncludeParameterValuesInErrors</code> switch.</li>
+        </ul>
+        <h3>Changed / fixed</h3>
+        <ul>
+          <li>Part-based <code class="inline">Initialize</code> overloads now build connection strings with <code class="inline">SqlConnectionStringBuilder</code> (connection-string-injection fix).</li>
+          <li>Internally-created connections open lazily instead of in the constructor.</li>
+          <li><code class="inline">SqlDataAdapter</code> in <code class="inline">OpenDataSet</code> is now disposed; <code class="inline">ExecuteScalar&lt;T&gt;</code> no longer double-measures <code class="inline">ExecuteTime</code>.</li>
+        </ul>
+        <div class="callout breaking"><span class="tag">Review before upgrading</span><div><p><strong>Transactions default to <code class="inline">ReadCommitted</code></strong> (was <code class="inline">Serializable</code>) — request the stricter level explicitly if you depended on it.</p><p><strong>Error context omits parameter values</strong> by default — set <code class="inline">IncludeParameterValuesInErrors = true</code> if your diagnostics relied on seeing them.</p></div></div>
+      </section>
+
+      <footer>
+        <div class="wrap">
+          <p>Iag.Unity.DataAccess v2.2.0 · MIT License · Built on Microsoft.Data.SqlClient 7.0.2 · Targets net462, netstandard2.0, net8.0.</p>
+        </div>
+      </footer>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  function setTheme(t) {
+    root.setAttribute('data-theme', t);
+    try { localStorage.setItem('iag-doc-theme', t); } catch (e) {}
+  }
+  function currentTheme() {
+    var saved; try { saved = localStorage.getItem('iag-doc-theme'); } catch (e) {}
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  setTheme(currentTheme());
+  function toggle() { setTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+  ['themeToggle', 'themeToggleM'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', toggle);
+  });
+
+  // ---- Mobile nav ----
+  var sidebar = document.getElementById('sidebar');
+  var scrim = document.getElementById('scrim');
+  var menuBtn = document.getElementById('menuBtn');
+  function closeNav() { sidebar.classList.remove('open'); scrim.classList.remove('open'); }
+  if (menuBtn) menuBtn.addEventListener('click', function () { sidebar.classList.toggle('open'); scrim.classList.toggle('open'); });
+  if (scrim) scrim.addEventListener('click', closeNav);
+  document.querySelectorAll('#toc a').forEach(function (a) { a.addEventListener('click', closeNav); });
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  var spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove('active'); });
+        var a = byId[en.target.id];
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(function (s) { spy.observe(s); });
+
+  // ---- Copy buttons + C# / bash highlighting ----
+  var CS_KW = /\b(using|namespace|public|private|protected|internal|static|class|abstract|void|var|new|return|try|catch|finally|throw|if|else|foreach|for|while|do|async|await|get|set|true|false|null|this|params|override|sealed|switch|out|ref|in|is|as)\b/;
+  var CS_PRIM = /\b(string|int|bool|object|decimal|double|long|short|byte|float|char)\b/;
+  var CS_TYPE = /\b([A-Z][A-Za-z0-9_]*)\b/;
+
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function highlight(text, lang) {
+    if (lang === 'bash') {
+      return esc(text).replace(/(#[^\n]*)/g, '<span class="tok-com">$1</span>')
+                      .replace(/\b(dotnet|add|package|nuget|push)\b/g, '<span class="tok-kw">$1</span>');
+    }
+    var re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(@?"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|([A-Za-z_][A-Za-z0-9_]*)|(\d+\.?\d*[mfdL]?)|([\s\S])/g;
+    var out = '', m;
+    while ((m = re.exec(text)) !== null) {
+      if (m[1] !== undefined) out += '<span class="tok-com">' + esc(m[1]) + '</span>';
+      else if (m[2] !== undefined) out += '<span class="tok-str">' + esc(m[2]) + '</span>';
+      else if (m[3] !== undefined) {
+        var w = m[3];
+        if (CS_KW.test(w) || CS_PRIM.test(w)) out += '<span class="tok-kw">' + esc(w) + '</span>';
+        else if (CS_TYPE.test(w)) out += '<span class="tok-type">' + esc(w) + '</span>';
+        else out += esc(w);
+      }
+      else if (m[4] !== undefined) out += '<span class="tok-num">' + esc(m[4]) + '</span>';
+      else out += esc(m[5]);
+    }
+    return out;
+  }
+
+  document.querySelectorAll('.code').forEach(function (block) {
+    var lang = block.getAttribute('data-lang') || 'csharp';
+    var code = block.querySelector('code');
+    var raw = code.textContent;
+
+    var head = document.createElement('div');
+    head.className = 'code-head';
+    var label = document.createElement('span');
+    label.className = 'code-lang';
+    label.textContent = lang === 'bash' ? 'shell' : 'C#';
+    var btn = document.createElement('button');
+    btn.className = 'copybtn'; btn.type = 'button'; btn.textContent = 'Copy';
+    btn.addEventListener('click', function () {
+      navigator.clipboard && navigator.clipboard.writeText(raw).then(function () {
+        btn.textContent = 'Copied'; btn.classList.add('done');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1400);
+      });
+    });
+    head.appendChild(label); head.appendChild(btn);
+    block.insertBefore(head, block.firstChild);
+
+    try { code.innerHTML = highlight(raw, lang); } catch (e) { /* leave plain */ }
+  });
+})();
+</script>
+</body>
+</html>
