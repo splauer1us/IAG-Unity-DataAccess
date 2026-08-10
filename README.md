@@ -2,7 +2,7 @@
 
 A lightweight data-access library that simplifies working with Microsoft SQL Server. It wraps `SqlConnection` and `SqlCommand` in a small set of objects and methods that make stored procedures, ad-hoc SQL, parameter handling, and object mapping straightforward.
 
-📖 **[Full documentation guide](docs/index.html)** — a browsable reference covering every feature (open locally, or serve the `docs/` folder via GitHub Pages).
+📖 **[Full documentation guide](docs/index.md)** — a complete reference covering every feature. A styled HTML version ([docs/index.html](docs/index.html)) is also available to open locally or serve via GitHub Pages.
 
 ## Target frameworks
 
