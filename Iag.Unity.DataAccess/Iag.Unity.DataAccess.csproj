@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFrameworks>netstandard2.0;net462;net8.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net462;net472;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -16,14 +16,14 @@
   <PackageReadmeFile>README.md</PackageReadmeFile>
   <Authors>Steve Lauer</Authors>
   <Company></Company>
-  <Description>Data access library that simplifies data access to a Microsoft SQL Server. Wraps SqlConnection and SqlCommand in a series of objects and methods that provide more straightforward usage. Multi-targets .NET Framework 4.6.2, .NET Standard 2.0, and .NET 8.0.</Description>
+  <Description>Data access library that simplifies data access to a Microsoft SQL Server. Wraps SqlConnection and SqlCommand in a series of objects and methods that provide more straightforward usage. Multi-targets .NET Framework 4.6.2, .NET Framework 4.7.2, .NET Standard 2.0, and .NET 8.0. Microsoft Entra ID (Azure AD) authentication is available on every target except .NET Framework 4.6.2.</Description>
   <PackageLicenseExpression>MIT</PackageLicenseExpression> <!-- or use a <PackageLicenseFile> -->
   <RepositoryUrl>https://github.com/splauer1us/IAG-Unity-DataAccess</RepositoryUrl>
 
   <!-- Versioning -->
-  <Version>2.2.0</Version>
-  <AssemblyVersion>2.2.0.0</AssemblyVersion>
-  <FileVersion>2.2.0.0</FileVersion>
+  <Version>2.3.0</Version>
+  <AssemblyVersion>2.3.0.0</AssemblyVersion>
+  <FileVersion>2.3.0.0</FileVersion>
   </PropertyGroup>
   
 
@@ -35,8 +35,30 @@
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
   </ItemGroup>
 
+  <!--
+    Microsoft Entra ID (Azure AD) support.
+
+    Azure.Identity ships only netstandard2.0 and net8.0 assets. On .NET Framework 4.6.2 the
+    netstandard2.0 asset requires a pile of System.Memory / System.Text.Json binding redirects,
+    so that target is built without the dependency and DataLibrary.Azure.cs is excluded from it.
+    net472 exists so that modern .NET Framework consumers still get Entra support: NuGet prefers
+    a same-family asset over netstandard2.0, so without it every .NET Framework consumer -
+    including 4.8 - would resolve the net462 asset and silently lose these APIs.
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net462'">
+    <PackageReference Include="Azure.Identity" Version="1.17.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Compile Remove="DataLibrary.Azure.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Iag.Unity.DataAccess.Tests" />
   </ItemGroup>
 
 </Project>

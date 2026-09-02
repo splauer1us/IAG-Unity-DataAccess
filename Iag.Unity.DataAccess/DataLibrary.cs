@@ -5,11 +5,24 @@ using System.Text;
 
 namespace Iag.Unity.DataAccess
 {
-    public static class DataLibrary
+    public static partial class DataLibrary
     {
         public static string ConnectionString { get; set; }
         public static bool IsInitialized { get; set; }
         public static Action<Exception> LoggingCallback { get; set; }
+
+        /// <summary>
+        /// Applied to every connection created by <see cref="GetConnection"/> before it is opened.
+        /// Set by <c>InitializeWithAzureCredentials</c> to attach the Entra ID token callback; null
+        /// otherwise, so the ordinary connection-string paths cost nothing.
+        /// </summary>
+        internal static Action<SqlConnection> ConnectionConfigurator { get; set; }
+
+        /// <summary>
+        /// Implemented in DataLibrary.Azure.cs, which is not compiled for net462. On that target
+        /// the call sites compile away.
+        /// </summary>
+        static partial void ClearAzureCredential();
 
         /// <summary>
         /// When true, the parameter <em>values</em> of a failed command are included in the
@@ -19,6 +32,16 @@ namespace Iag.Unity.DataAccess
         /// </summary>
         public static bool IncludeParameterValuesInErrors { get; set; } = false;
         public static void Initialize(string connectionString, Action<Exception> loggingCallback = null)
+        {
+            // Drop any Entra ID credential left by a previous initialization; this connection
+            // string carries its own credentials and SqlClient rejects an access token alongside them.
+            ConnectionConfigurator = null;
+            ClearAzureCredential();
+
+            InitializeCore(connectionString, loggingCallback);
+        }
+
+        private static void InitializeCore(string connectionString, Action<Exception> loggingCallback)
         {
             try
             {
@@ -71,6 +94,12 @@ namespace Iag.Unity.DataAccess
             if (String.IsNullOrWhiteSpace(DataLibrary.ConnectionString))
                 throw new InvalidOperationException("Unable to retrieve default connection.  The DataLibrary has not been initialized.");
             SqlConnection connection = new SqlConnection(DataLibrary.ConnectionString);
+
+            // Attaches the Entra ID access-token callback when the library was initialized with a
+            // TokenCredential. It must happen even when doNotOpen is true, because BaseCommand
+            // creates its connection here and opens it later on first use.
+            ConnectionConfigurator?.Invoke(connection);
+
             if (!doNotOpen)
                 connection.Open();
             return connection;

@@ -9,10 +9,13 @@ A lightweight data-access library that simplifies working with Microsoft SQL Ser
 A single package multi-targets:
 
 - **.NET Framework 4.6.2**
+- **.NET Framework 4.7.2**
 - **.NET Standard 2.0**
 - **.NET 8.0**
 
 Built on [`Microsoft.Data.SqlClient`](https://www.nuget.org/packages/Microsoft.Data.SqlClient) `7.0.2`.
+
+> **Note** — the [Microsoft Entra ID](#microsoft-entra-id-azure-authentication) APIs are available on every target **except** .NET Framework 4.6.2. .NET Framework consumers on **4.7.2 or later** resolve the `net472` asset and have them; 4.6.2 – 4.7.1 consumers do not. See [Microsoft Entra ID (Azure) authentication](#microsoft-entra-id-azure-authentication).
 
 ## Install
 
@@ -28,6 +31,16 @@ Initialize once with a connection string:
 using Iag.Unity.DataAccess;
 
 DataLibrary.Initialize("Server=.;Database=MyDb;Integrated Security=true;");
+```
+
+…or, for a database in Azure, with a Microsoft Entra ID credential:
+
+```csharp
+using Azure.Identity;
+
+await DataLibrary.InitializeWithAzureCredentialsAsync(
+    new DefaultAzureCredential(),
+    "Server=tcp:my-server.database.windows.net,1433;Database=MyDb;");
 ```
 
 Run a stored procedure and get a `DataTable`:
@@ -58,6 +71,47 @@ using (var sp = new StoredProcedure("dbo.GetCustomers"))
     List<Customer> customers = sp.GetObjects<Customer>().ToList();
 }
 ```
+
+## Microsoft Entra ID (Azure) authentication
+
+For a database in Azure, initialize with an `Azure.Core.TokenCredential` instead of a connection string that carries credentials. The library stores the **credential**, not a token, and acquires a fresh access token for each connection as it opens — so it keeps working past the ~1 hour lifetime of any single token.
+
+```csharp
+using Azure.Identity;
+
+// DefaultAzureCredential: environment → workload identity → managed identity →
+// Visual Studio / Azure CLI / Azure PowerShell
+await DataLibrary.InitializeWithAzureCredentialsAsync(
+    new DefaultAzureCredential(),
+    "Server=tcp:my-server.database.windows.net,1433;Database=MyDb;");
+
+// A specific credential is better in production — see the note below
+await DataLibrary.InitializeWithAzureCredentialsAsync(
+    new ManagedIdentityCredential(clientId: "…"),
+    "my-server.database.windows.net", "MyDb");
+```
+
+Commands are then used exactly as before — `StoredProcedure`, `UnitySqlCommand`, transactions and the async methods all work unchanged, and the async execute methods acquire the token asynchronously too.
+
+| Member | Description |
+| --- | --- |
+| `InitializeWithAzureCredentials(credential, connectionString, loggingCallback?)` | Initialize and test the connection. |
+| `InitializeWithAzureCredentials(credential, server, db, loggingCallback?)` | Same, building the connection string from parts. |
+| `InitializeWithAzureCredentials(connectionString, loggingCallback?)` | Same, using `new DefaultAzureCredential()`. |
+| `InitializeWithAzureCredentialsAsync(…, cancellationToken?)` | Async counterparts — **preferred**, see below. |
+| `AzureCredential` | The credential in use, or `null` when initialized from a plain connection string. |
+| `AzureSqlScope` | Token scope. Defaults to `DefaultAzureSqlScope`; change it for a sovereign cloud. |
+| `DefaultAzureSqlScope` | `https://database.windows.net/.default` (public cloud). |
+
+Things worth knowing:
+
+- **Prefer the `…Async` overloads.** A synchronous `Open()` blocks on token acquisition, and the first acquisition through `DefaultAzureCredential` can take seconds while it probes its chain of sources.
+- **Prefer a specific credential in production.** `ManagedIdentityCredential`, or a `DefaultAzureCredential` built with `DefaultAzureCredentialOptions` that excludes the sources you don't use — the full chain is slow and can pick up an unintended identity.
+- **The connection string must not carry credentials of its own.** `Integrated Security`, `User ID`, `Password` and `Authentication` are rejected with a message saying what to remove, because SqlClient will not accept an access token alongside them. `Encrypt` is upgraded to `Mandatory` if the string explicitly opted out; an explicit `Encrypt=Strict` is left alone.
+- **A connection you supply yourself is untouched.** Passing your own `SqlConnection` to a command bypasses `DataLibrary.GetConnection`, so set `AccessTokenCallback` on it yourself if it needs Entra authentication.
+- **A later plain `Initialize(...)` disarms Entra authentication**, clearing `AzureCredential` so the new connection string's own credentials are used.
+- **Access tokens are never logged.** A failed acquisition surfaces as an `InvalidOperationException` naming the credential type and scope, with the `Azure.Identity` exception as its inner exception, and is passed to `LoggingCallback`.
+- **Not available on .NET Framework 4.6.2** — see [Target frameworks](#target-frameworks).
 
 ## `Prepare()` is optional
 
@@ -162,6 +216,24 @@ When a command fails, the resulting `ContextualSqlException.Context` includes th
 ```csharp
 DataLibrary.IncludeParameterValuesInErrors = true;
 ```
+
+## Tests
+
+`Iag.Unity.DataAccess.Tests` (xunit + Shouldly, net8.0) holds both unit and integration tests. Unit tests need nothing but the SDK:
+
+```bash
+dotnet test --filter "Category!=Integration"
+```
+
+Integration tests are marked `[Trait("Category", "Integration")]` and stand up a real SQL Server 2022 in Docker via [Testcontainers](https://testcontainers.com/), creating a `Tests` database with the widget table and stored procedures the tests use:
+
+```bash
+dotnet test --filter "Category=Integration"
+```
+
+They need a reachable Docker daemon. If Docker lives in WSL rather than on the Windows host, run the command from inside WSL (`wsl -e bash -lc "cd /mnt/<repo path> && dotnet test …"`) — a Windows-side test host cannot reach a WSL-only daemon.
+
+`DataLibrary` is static, so the assembly runs test collections serially (`AssemblyInfo.cs`); don't re-enable parallelization without giving the connection-string state somewhere per-collection to live.
 
 ## Full API documentation
 
