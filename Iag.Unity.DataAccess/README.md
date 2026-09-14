@@ -18,6 +18,23 @@ using (UnitySqlCommand cmd = new UnitySqlCommand(conn2 "<Your procedure name>"))
 }
 ```
 
+## Connecting to Azure SQL with Microsoft Entra ID
+For a database in Azure, initialize with an `Azure.Core.TokenCredential` instead of a connection string that carries credentials:
+```c#
+using Azure.Identity;
+
+await DataLibrary.InitializeWithAzureCredentialsAsync(
+    new DefaultAzureCredential(),
+    "Server=tcp:my-server.database.windows.net,1433;Database=MyDb;");
+```
+The credential — not a token — is stored, and a fresh access token is acquired for each connection as it opens, so the library keeps working past the ~1 hour lifetime of any single token. Everything else is unchanged: `StoredProcedure`, `UnitySqlCommand`, transactions and the async methods behave exactly as they do with a plain connection string.
+
+Notes:
+- Prefer the `...Async` initializers. A synchronous `Open()` blocks on token acquisition, and the first `DefaultAzureCredential` acquisition can take seconds while it probes its chain of sources. In production prefer a specific credential (`ManagedIdentityCredential`) or a trimmed `DefaultAzureCredentialOptions`.
+- The connection string must not set `Integrated Security`, `User ID`, `Password` or `Authentication` — SqlClient will not accept an access token alongside them, so those are rejected with a message saying what to remove. `Encrypt=false` is upgraded to `Mandatory`.
+- Overloads: `(credential, connectionString)`, `(credential, server, database)`, `(connectionString)` using `new DefaultAzureCredential()`, each with a `...Async` counterpart and an optional logging callback. `DataLibrary.AzureSqlScope` sets the token scope for sovereign clouds.
+- These APIs are available on every target framework **except** .NET Framework 4.6.2; .NET Framework consumers on 4.7.2 or later have them.
+
 ## Executing a stored procedure without parameters (returning a single table):
 ```c#
 using (StoredProcedure sp = new StoredProcedure("<Your procedure name>"))

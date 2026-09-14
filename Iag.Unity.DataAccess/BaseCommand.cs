@@ -813,7 +813,8 @@ namespace Iag.Unity.DataAccess
 
         // Column->object mapping shared by the sync and async GetObjects paths. Pure CPU work
         // (reflection + conversion) once the DataTable is in hand, so there is nothing to await here.
-        private IEnumerable<T> MapTable<T>(DataTable table, Func<string, string> mapFunction, Action<TranslationHandler> translationAction, bool strict) where T : class, new()
+        // Internal rather than private so the mapping unit tests can exercise it without a server.
+        internal IEnumerable<T> MapTable<T>(DataTable table, Func<string, string> mapFunction, Action<TranslationHandler> translationAction, bool strict) where T : class, new()
         {
             // Build the column->property plan once, not once per row.
             List<PropertyMapping> plan = BuildMappingPlan<T>(table, mapFunction, strict);

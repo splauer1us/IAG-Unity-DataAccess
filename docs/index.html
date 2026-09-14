@@ -253,7 +253,7 @@
     <div class="brand">
       <span class="brand-title">Iag.Unity.DataAccess</span>
       <div class="brand-badges">
-        <span class="pill accent">v2.2.0</span>
+        <span class="pill accent">v2.3.0</span>
         <span class="pill">MIT</span>
         <span class="pill">SqlClient 7.0.2</span>
       </div>
@@ -263,6 +263,7 @@
       <a href="#overview">Overview</a>
       <a href="#install">Installation</a>
       <a href="#getting-started">Getting started</a>
+      <a href="#azure-auth">Entra ID (Azure) auth</a>
       <span class="toc-group">Core</span>
       <a href="#core-types">Command types</a>
       <a href="#parameters">Parameters</a>
@@ -277,7 +278,7 @@
       <a href="#security">Security</a>
       <span class="toc-group">Reference</span>
       <a href="#api-reference">API reference</a>
-      <a href="#changelog">What's new in 2.2.0</a>
+      <a href="#changelog">What's new in 2.3.0</a>
     </nav>
   </aside>
 
@@ -289,9 +290,10 @@
         <p class="lede">Iag.Unity.DataAccess turns stored procedures and ad-hoc SQL into a few small objects — parameters, object mapping, transactions, and now full async — without hiding what ADO.NET is actually doing underneath.</p>
         <div class="hero-meta">
           <span class="pill">net462</span>
+          <span class="pill">net472</span>
           <span class="pill">netstandard2.0</span>
           <span class="pill">net8.0</span>
-          <span class="pill accent">async + IAsyncDisposable</span>
+          <span class="pill accent">Entra ID auth</span>
         </div>
         <div class="code" data-lang="csharp"><pre><code class="language-csharp">using (var sp = new StoredProcedure("dbo.GetCustomers"))
 {
@@ -307,12 +309,14 @@
           <div class="card"><span class="k">Optional Prepare</span><h4>Metadata only when you need it</h4><p>Skip the server round-trip for input-only procs; call <code class="inline">Prepare()</code> when you want derived types and output values.</p></div>
           <div class="card"><span class="k">Object mapping</span><h4>Rows to typed objects</h4><p><code class="inline">GetObjects&lt;T&gt;()</code> maps by name, by attribute, or by a custom function.</p></div>
           <div class="card"><span class="k">Full async</span><h4>Genuine non-blocking I/O</h4><p>Every execute method has an <code class="inline">...Async</code> twin with <code class="inline">CancellationToken</code> support.</p></div>
+          <div class="card"><span class="k">Entra ID auth</span><h4>Passwordless Azure SQL</h4><p>Initialize with a <code class="inline">TokenCredential</code>; tokens are acquired per connection and refreshed automatically.</p></div>
         </div>
       </section>
 
       <section id="install" class="prose">
         <h2><span class="h2-eyebrow">Start</span>Installation</h2>
-        <p>Install from NuGet. The single package multi-targets .NET Framework 4.6.2, .NET Standard 2.0, and .NET 8.0, and is built on <code class="inline">Microsoft.Data.SqlClient</code> 7.0.2.</p>
+        <p>Install from NuGet. The single package multi-targets .NET Framework 4.6.2, .NET Framework 4.7.2, .NET Standard 2.0, and .NET 8.0, and is built on <code class="inline">Microsoft.Data.SqlClient</code> 7.0.2.</p>
+        <div class="callout note"><span class="tag">Framework support</span><div><p>The <a href="#azure-auth">Microsoft Entra ID</a> APIs are available on every target <strong>except</strong> .NET Framework 4.6.2, where the <code class="inline">netstandard2.0</code> build of <code class="inline">Azure.Identity</code> would require extensive binding redirects. NuGet prefers a same-family asset over <code class="inline">netstandard2.0</code>, so .NET Framework consumers on <strong>4.7.2 or later</strong> resolve the <code class="inline">net472</code> asset and have those APIs; 4.6.2 – 4.7.1 consumers resolve <code class="inline">net462</code> and do not.</p></div></div>
         <div class="code" data-lang="bash"><pre><code class="language-bash">dotnet add package Iag.Unity.DataAccess.dll</code></pre></div>
         <div class="callout note"><span class="tag">Note</span><div><p>The package id carries a <code class="inline">.dll</code> suffix (<code class="inline">Iag.Unity.DataAccess.dll</code>) — that is the id on NuGet, not a filename. The assembly and namespace are plain <code class="inline">Iag.Unity.DataAccess</code>.</p></div></div>
       </section>
@@ -341,6 +345,60 @@ using (var sp = new StoredProcedure(conn, "dbo.GetCustomer"))
     DataTable tbl = sp.OpenTable();
 } // conn is disposed by its own using, not by sp</code></pre></div>
         <div class="callout tip"><span class="tag">Since 2.2</span><div><p>An internally-created connection is no longer opened in the constructor — it opens lazily on the first execute/prepare call. Constructing a command no longer reserves a pooled connection you might never use.</p></div></div>
+      </section>
+
+      <section id="azure-auth" class="prose">
+        <h2><span class="h2-eyebrow">Start</span>Microsoft Entra ID (Azure) authentication</h2>
+        <p><em>New in 2.3. Available on net472, netstandard2.0 and net8.0 — see <a href="#install">Installation</a>.</em></p>
+        <p>For a database in Azure, initialize with an <code class="inline">Azure.Core.TokenCredential</code> rather than a connection string that carries credentials. Nothing else about using the library changes: <code class="inline">StoredProcedure</code>, <code class="inline">UnitySqlCommand</code>, transactions and every async method work exactly as they do with a plain connection string.</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">using Azure.Identity;
+using Iag.Unity.DataAccess;
+
+await DataLibrary.InitializeWithAzureCredentialsAsync(
+    new DefaultAzureCredential(),
+    "Server=tcp:my-server.database.windows.net,1433;Database=MyDb;");</code></pre></div>
+
+        <h3>How the token is managed</h3>
+        <p>The library stores the <strong>credential</strong>, not a token. A token grabbed once at startup would expire in about an hour and leave every later connection failing, so instead each connection created by <code class="inline">DataLibrary.GetConnection</code> — including the ones commands create for themselves — gets SqlClient's <code class="inline">AccessTokenCallback</code> attached, and SqlClient invokes it as tokens expire. <code class="inline">Azure.Identity</code> credentials cache tokens in memory and refresh near expiry, so the per-connection cost after the first acquisition is negligible.</p>
+        <p>A useful consequence: because commands create their connection unopened and open it on first use, the async execute methods acquire the token asynchronously as well, with no extra work on your part.</p>
+        <p>A connection you construct yourself and pass to a command (<a href="#getting-started">Managing connections yourself</a>) is never modified by the library, so it carries no token callback — set <code class="inline">AccessTokenCallback</code> (or <code class="inline">AccessToken</code>) on it before use if it needs Entra authentication.</p>
+
+        <h3>Choosing a credential</h3>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">// Explicit is better in production: no probing, no ambiguity about which identity is used
+await DataLibrary.InitializeWithAzureCredentialsAsync(
+    new ManagedIdentityCredential(clientId: "00000000-0000-0000-0000-000000000000"),
+    "my-server.database.windows.net", "MyDb");
+
+// Or trim DefaultAzureCredential's chain
+var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+{
+    ExcludeInteractiveBrowserCredential = true,
+    ExcludeAzurePowerShellCredential = true,
+});</code></pre></div>
+        <p><code class="inline">DefaultAzureCredential</code> walks a chain — environment variables, workload identity, managed identity, Visual Studio, Azure CLI, Azure PowerShell — which makes it excellent for local development and slow, occasionally surprising, in production.</p>
+        <div class="callout tip"><span class="tag">Prefer async</span><div><p>A synchronous <code class="inline">Open()</code> has to block on token acquisition, and the first <code class="inline">DefaultAzureCredential</code> acquisition can take seconds while it probes that chain. Use the <code class="inline">…Async</code> initializers.</p></div></div>
+
+        <h3>Connection-string rules</h3>
+        <p>The connection string must not carry credentials of its own, because SqlClient refuses an access token alongside them. Rather than letting that surface as an opaque driver error, initialization rejects it up front with a message naming what to remove:</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Keyword</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td><code>Integrated Security</code> / <code>Trusted_Connection</code></td><td class="desc"><code>ArgumentException</code></td></tr>
+            <tr><td><code>User ID</code> / <code>Password</code></td><td class="desc"><code>ArgumentException</code></td></tr>
+            <tr><td><code>Authentication</code></td><td class="desc"><code>ArgumentException</code></td></tr>
+            <tr><td>missing <code>Server</code> / <code>Data Source</code></td><td class="desc"><code>ArgumentException</code></td></tr>
+            <tr><td><code>Encrypt=false</code></td><td class="desc">upgraded to <code>Mandatory</code> — a bearer token is never sent unencrypted</td></tr>
+            <tr><td><code>Encrypt=Strict</code></td><td class="desc">left as-is</td></tr>
+          </tbody>
+        </table></div>
+        <p>Calling a plain <code class="inline">Initialize(...)</code> afterwards disarms Entra authentication and clears <code class="inline">AzureCredential</code>, so the new connection string's own credentials take effect.</p>
+
+        <h3>Sovereign clouds</h3>
+        <p><code class="inline">AzureSqlScope</code> defaults to <code class="inline">DefaultAzureSqlScope</code> (<code class="inline">https://database.windows.net/.default</code>). Set it before initializing for other clouds:</p>
+        <div class="code" data-lang="csharp"><pre><code class="language-csharp">DataLibrary.AzureSqlScope = "https://database.usgovcloudapi.net/.default";</code></pre></div>
+
+        <h3>Failures</h3>
+        <p>A failed token acquisition is wrapped in an <code class="inline">InvalidOperationException</code> naming the credential type and the scope, with the original <code class="inline">Azure.Identity</code> exception (typically <code class="inline">AuthenticationFailedException</code>) as its inner exception, and is also handed to <code class="inline">LoggingCallback</code>. The token itself never appears in a message or a log.</p>
       </section>
 
       <section id="core-types" class="prose">
@@ -563,6 +621,7 @@ catch (ContextualSqlException ex)
         <ul>
           <li><strong>Always parameterize.</strong> Use <code class="inline">Parameters["@x"]</code> and never concatenate user input into a <code class="inline">UnitySqlCommand</code> statement. Parameters are sent as real <code class="inline">SqlParameter</code>s.</li>
           <li><strong>Connection-string safety (2.2).</strong> The part-based <code class="inline">Initialize</code> overloads build the string with <code class="inline">SqlConnectionStringBuilder</code>, so special characters in a password or server name can't inject additional keywords.</li>
+          <li><strong>Entra ID over stored credentials (2.3).</strong> <code class="inline">InitializeWithAzureCredentials</code> removes passwords from configuration entirely. It rejects a connection string that carries its own credentials, upgrades <code class="inline">Encrypt=false</code> to <code class="inline">Mandatory</code> so a bearer token is never sent unencrypted, and never writes an access token to a log or exception message.</li>
           <li><strong>Sensitive data in errors.</strong> Parameter values stay out of exception context unless you explicitly enable <code class="inline">IncludeParameterValuesInErrors</code>. Keep it off in production.</li>
         </ul>
       </section>
@@ -577,6 +636,13 @@ catch (ContextualSqlException ex)
             <tr><td><code>Initialize(connectionString, loggingCallback?)</code></td><td class="desc">Set the default connection string and test the connection.</td></tr>
             <tr><td><code>Initialize(server, db)</code></td><td class="desc">Integrated-security connection, built via <code>SqlConnectionStringBuilder</code>.</td></tr>
             <tr><td><code>Initialize(server, db, user, password)</code></td><td class="desc">SQL-login connection, built safely from parts.</td></tr>
+            <tr><td><code>InitializeWithAzureCredentials(credential, connectionString, loggingCallback?)</code></td><td class="desc">Entra ID connection using an <code>Azure.Core.TokenCredential</code>. Not on net462.</td></tr>
+            <tr><td><code>InitializeWithAzureCredentials(credential, server, db, loggingCallback?)</code></td><td class="desc">Same, built from parts. Not on net462.</td></tr>
+            <tr><td><code>InitializeWithAzureCredentials(connectionString, loggingCallback?)</code></td><td class="desc">Same, using <code>new DefaultAzureCredential()</code>. Not on net462.</td></tr>
+            <tr><td><code>InitializeWithAzureCredentialsAsync(…, cancellationToken?)</code></td><td class="desc">Async counterparts of the three above; preferred. Not on net462.</td></tr>
+            <tr><td><code>AzureCredential</code></td><td class="desc">The credential in use, or null when initialized from a plain connection string.</td></tr>
+            <tr><td><code>AzureSqlScope</code></td><td class="desc">Token scope; defaults to <code>DefaultAzureSqlScope</code>. Set for sovereign clouds.</td></tr>
+            <tr><td><code>DefaultAzureSqlScope</code></td><td class="desc"><code>https://database.windows.net/.default</code> (public cloud).</td></tr>
             <tr><td><code>ConnectionString</code></td><td class="desc">The active default connection string.</td></tr>
             <tr><td><code>IsInitialized</code></td><td class="desc">True once a connection has been established successfully.</td></tr>
             <tr><td><code>LoggingCallback</code></td><td class="desc"><code>Action&lt;Exception&gt;</code> invoked for internal diagnostics.</td></tr>
@@ -620,6 +686,21 @@ catch (ContextualSqlException ex)
       </section>
 
       <section id="changelog" class="prose">
+        <h2><span class="h2-eyebrow">Reference</span>What's new in 2.3.0</h2>
+        <h3>Added</h3>
+        <ul>
+          <li><strong>Microsoft Entra ID (Azure AD) authentication.</strong> <code class="inline">InitializeWithAzureCredentials</code> / <code class="inline">InitializeWithAzureCredentialsAsync</code> accept an <code class="inline">Azure.Core.TokenCredential</code> such as <code class="inline">DefaultAzureCredential</code>. Tokens are acquired per connection through SqlClient's <code class="inline">AccessTokenCallback</code> and refreshed automatically — see <a href="#azure-auth">Entra ID (Azure) auth</a>.</li>
+          <li><code class="inline">DataLibrary.AzureCredential</code>, <code class="inline">DataLibrary.AzureSqlScope</code> and <code class="inline">DataLibrary.DefaultAzureSqlScope</code>.</li>
+          <li><strong>A <code class="inline">net472</code> target.</strong> NuGet prefers a same-family asset over <code class="inline">netstandard2.0</code>, so without it every .NET Framework consumer would resolve <code class="inline">net462</code>; <code class="inline">net472</code> is what gives modern .NET Framework consumers the Entra APIs.</li>
+        </ul>
+        <h3>Changed / fixed</h3>
+        <ul>
+          <li><code class="inline">Initialize(...)</code> now clears any Entra credential from a previous initialization, so a connection string carrying its own credentials is not paired with a stale access-token callback.</li>
+        </ul>
+        <div class="callout note"><span class="tag">.NET Framework 4.6.2 – 4.7.1</span><div><p>The Entra ID APIs are absent from the <code class="inline">net462</code> build — <code class="inline">Azure.Identity</code> ships no .NET Framework asset, and its <code class="inline">netstandard2.0</code> build needs extensive binding redirects on 4.6.2. Retarget to 4.7.2 or later to use them. Everything else in the library is unchanged on <code class="inline">net462</code>.</p></div></div>
+      </section>
+
+      <section id="changelog-220" class="prose">
         <h2><span class="h2-eyebrow">Reference</span>What's new in 2.2.0</h2>
         <h3>Added</h3>
         <ul>
@@ -639,7 +720,7 @@ catch (ContextualSqlException ex)
 
       <footer>
         <div class="wrap">
-          <p>Iag.Unity.DataAccess v2.2.0 · MIT License · Built on Microsoft.Data.SqlClient 7.0.2 · Targets net462, netstandard2.0, net8.0.</p>
+          <p>Iag.Unity.DataAccess v2.3.0 · MIT License · Built on Microsoft.Data.SqlClient 7.0.2 · Targets net462, net472, netstandard2.0, net8.0.</p>
         </div>
       </footer>
     </div>
